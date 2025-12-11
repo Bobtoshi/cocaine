@@ -170,8 +170,11 @@ cd dashboard && rm -rf node_modules && npm install
 
 ```bash
 # Clone repository
-git clone https://github.com/YOUR_USERNAME/cocaine.git
+git clone https://github.com/bobtoshi/cocaine.git
 cd cocaine
+
+# Initialize submodules
+git submodule update --init --force --recursive
 
 # Build
 mkdir build && cd build

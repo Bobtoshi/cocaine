@@ -18,6 +18,10 @@ sudo apt-get install -y build-essential cmake pkg-config \
     libsodium-dev libreadline-dev libexpat1-dev \
     libpgm-dev libnorm-dev git
 
+# Initialize submodules
+echo "[*] Initializing submodules..."
+git submodule update --init --force --recursive
+
 # Build
 echo "[*] Building daemon (this takes 10-20 minutes)..."
 mkdir -p build
