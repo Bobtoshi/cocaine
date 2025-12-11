@@ -118,3 +118,15 @@ nbproject
 __pycache__/
 *.pyc
 *.log
+
+# Cocaine specific
+blockchain/
+data/
+wallets/
+*.keys
+*.wallet
+node_modules/
+release/bin/
+release/data/
+release/wallets/
+cocaine-src.tar.gz
