@@ -181,8 +181,11 @@ mkdir build && cd build
 cmake ..
 make -j$(nproc) daemon simplewallet
 
-# Run
-./bin/cocained --offline --fixed-difficulty 1000
+# Run daemon
+./bin/cocained --detach
+
+# Check status
+curl http://127.0.0.1:19081/json_rpc -d '{"jsonrpc":"2.0","id":"0","method":"get_info"}' -H "Content-Type: application/json"
 ```
 
 ## License
