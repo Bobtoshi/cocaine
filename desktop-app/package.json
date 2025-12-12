@@ -1,0 +1,56 @@
+{
+  "name": "cocaine-wallet",
+  "version": "1.0.0",
+  "description": "COCAINE Cryptocurrency Wallet",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder",
+    "build:mac": "electron-builder --mac",
+    "build:win": "electron-builder --win",
+    "build:all": "electron-builder --mac --win"
+  },
+  "author": "Bobtoshi",
+  "license": "BSD-3-Clause",
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  },
+  "build": {
+    "appId": "com.cocaine.wallet",
+    "productName": "COCAINE Wallet",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "server.js",
+      "public/**/*",
+      "bin/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "bin",
+        "to": "bin",
+        "filter": ["**/*"]
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.finance",
+      "target": ["zip"],
+      "icon": "icons/icon.png"
+    },
+    "win": {
+      "target": ["zip"],
+      "icon": "icons/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}
