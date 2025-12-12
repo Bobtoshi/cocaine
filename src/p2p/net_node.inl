@@ -732,7 +732,6 @@ namespace nodetool
     {
       // Cocaine seed nodes
       full_addrs.insert("bore.pub:43111");
-      full_addrs.insert("138.68.158.175:19080");
     }
     return full_addrs;
   }
