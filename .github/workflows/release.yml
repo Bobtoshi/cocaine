@@ -41,6 +41,7 @@ jobs:
           submodules: recursive
 
       - name: Build static release
+        shell: bash
         run: |
           source "$HOME/.cargo/env"
           mkdir -p build/release
@@ -49,6 +50,7 @@ jobs:
           make -j$(nproc) daemon simplewallet wallet_rpc_server
 
       - name: Package binaries
+        shell: bash
         run: |
           mkdir -p cocaine-linux-x64
           cp build/release/bin/cocained cocaine-linux-x64/
