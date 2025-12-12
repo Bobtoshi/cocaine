@@ -155,7 +155,7 @@ COCAINE is a real peer-to-peer network. When you start the daemon:
 - Mined coins can be sent to anyone on the network
 
 **Seed Nodes**:
-- `86.0.199.33:19080` (Primary)
+- `bore.pub:43111` (Primary)
 - `138.68.158.175:19080` (Backup)
 
 ### Running Your Own Seed Node
