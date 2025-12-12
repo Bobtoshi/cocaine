@@ -40,13 +40,13 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Build static release
+      - name: Build release
         shell: bash
         run: |
           source "$HOME/.cargo/env"
           mkdir -p build/release
           cd build/release
-          cmake -D STATIC=ON -D ARCH="default" -D CMAKE_BUILD_TYPE=Release ../..
+          cmake -D ARCH="default" -D CMAKE_BUILD_TYPE=Release ../..
           make -j$(nproc) daemon simplewallet wallet_rpc_server
 
       - name: Package binaries
