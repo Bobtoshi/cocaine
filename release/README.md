@@ -11,16 +11,65 @@ A privacy-focused cryptocurrency with peer-to-peer networking.
  ╚═════╝ ╚═════╝  ╚═════╝╚═╝  ╚═╝╚═╝╚═╝  ╚═══╝╚══════╝
 ```
 
+## Downloads
+
+Download pre-built binaries for your platform:
+
+| Platform | Download |
+|----------|----------|
+| **Windows x64** | [cocaine-windows-x64.zip](https://github.com/Bobtoshi/cocaine/releases/latest/download/cocaine-windows-x64.zip) |
+| **Linux x64** | [cocaine-linux-x64.tar.gz](https://github.com/Bobtoshi/cocaine/releases/latest/download/cocaine-linux-x64.tar.gz) |
+| **macOS** | [cocaine-macos.tar.gz](https://github.com/Bobtoshi/cocaine/releases/latest/download/cocaine-macos.tar.gz) |
+
+[View all releases](https://github.com/Bobtoshi/cocaine/releases)
+
+---
+
 ## Quick Start
 
-### Requirements
-- macOS or Linux
-- Node.js 16+ (https://nodejs.org)
-- npm
+### Windows
 
-### Start Mining in 30 Seconds
+1. Download and extract `cocaine-windows-x64.zip`
+2. Open Command Prompt or PowerShell in the extracted folder
+3. Start the daemon:
+   ```cmd
+   cocained.exe
+   ```
+4. Open a new terminal and create/open your wallet:
+   ```cmd
+   cocaine-wallet-cli.exe --generate-new-wallet mywallet
+   ```
+5. Start mining (in the wallet):
+   ```
+   start_mining 4
+   ```
+   (Replace `4` with the number of CPU threads you want to use)
+
+### Linux
 
 ```bash
+# Download and extract
+wget https://github.com/Bobtoshi/cocaine/releases/latest/download/cocaine-linux-x64.tar.gz
+tar -xzvf cocaine-linux-x64.tar.gz
+cd cocaine-linux-x64
+
+# Start daemon in background
+./cocained --detach
+
+# Create wallet and start mining
+./cocaine-wallet-cli --generate-new-wallet mywallet
+# In wallet: start_mining 4
+```
+
+### macOS (with Dashboard)
+
+For macOS users, we provide a convenient script with a web dashboard:
+
+```bash
+# Clone the repo
+git clone https://github.com/Bobtoshi/cocaine.git
+cd cocaine
+
 # Make executable (first time only)
 chmod +x cocaine.sh
 
@@ -28,7 +77,7 @@ chmod +x cocaine.sh
 ./cocaine.sh mine
 ```
 
-That's it! The script will:
+The script will:
 1. Start the daemon
 2. Create a new wallet (or use existing)
 3. Start mining to your wallet

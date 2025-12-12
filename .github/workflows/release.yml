@@ -1,0 +1,229 @@
+name: Release Binaries
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g., v1.0.1)'
+        required: true
+        default: 'v1.0.1'
+
+env:
+  BUILD_TARGETS: daemon simplewallet wallet_rpc_server
+
+jobs:
+  build-linux:
+    name: 'Linux x64'
+    runs-on: ubuntu-22.04
+    container:
+      image: ubuntu:22.04
+      env:
+        DEBIAN_FRONTEND: noninteractive
+    steps:
+      - name: Install dependencies
+        run: |
+          apt update
+          apt -y install build-essential cmake git libboost-all-dev miniupnpc libunbound-dev \
+            pkg-config libssl-dev libzmq3-dev libsodium-dev libhidapi-dev libusb-1.0-0-dev \
+            libprotobuf-dev protobuf-compiler curl
+          # Install Rust
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+      - name: Configure git
+        run: git config --global --add safe.directory '*'
+
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Build static release
+        run: |
+          source "$HOME/.cargo/env"
+          mkdir -p build/release
+          cd build/release
+          cmake -D STATIC=ON -D ARCH="default" -D CMAKE_BUILD_TYPE=Release ../..
+          make -j$(nproc) daemon simplewallet wallet_rpc_server
+
+      - name: Package binaries
+        run: |
+          mkdir -p cocaine-linux-x64
+          cp build/release/bin/cocained cocaine-linux-x64/
+          cp build/release/bin/cocaine-wallet-cli cocaine-linux-x64/
+          cp build/release/bin/cocaine-wallet-rpc cocaine-linux-x64/
+          chmod +x cocaine-linux-x64/*
+          tar -czvf cocaine-linux-x64.tar.gz cocaine-linux-x64/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cocaine-linux-x64
+          path: cocaine-linux-x64.tar.gz
+
+  build-windows:
+    name: 'Windows x64'
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          update: true
+          install: >-
+            mingw-w64-x86_64-toolchain
+            make
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-boost
+            mingw-w64-x86_64-openssl
+            mingw-w64-x86_64-zeromq
+            mingw-w64-x86_64-libsodium
+            mingw-w64-x86_64-hidapi
+            mingw-w64-x86_64-protobuf
+            mingw-w64-x86_64-libusb
+            mingw-w64-x86_64-unbound
+            mingw-w64-x86_64-rust
+            git
+            pkg-config
+
+      - name: Build static release
+        run: |
+          mkdir -p build/release
+          cd build/release
+          cmake -G "MSYS Makefiles" -D STATIC=ON -D ARCH="default" -D CMAKE_BUILD_TYPE=Release ../..
+          make -j$(nproc) daemon simplewallet wallet_rpc_server
+
+      - name: Package binaries
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path cocaine-windows-x64
+          Copy-Item build/release/bin/cocained.exe cocaine-windows-x64/
+          Copy-Item build/release/bin/cocaine-wallet-cli.exe cocaine-windows-x64/
+          Copy-Item build/release/bin/cocaine-wallet-rpc.exe cocaine-windows-x64/
+          Compress-Archive -Path cocaine-windows-x64/* -DestinationPath cocaine-windows-x64.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cocaine-windows-x64
+          path: cocaine-windows-x64.zip
+
+  build-macos:
+    name: 'macOS (Intel + ARM)'
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          brew update
+          brew install cmake boost hidapi openssl zmq miniupnpc expat protobuf
+
+      - name: Build release
+        run: |
+          mkdir -p build/release
+          cd build/release
+          cmake -D ARCH="default" -D CMAKE_BUILD_TYPE=Release ../..
+          make -j$(sysctl -n hw.logicalcpu) daemon simplewallet wallet_rpc_server
+
+      - name: Package binaries
+        run: |
+          mkdir -p cocaine-macos
+          cp build/release/bin/cocained cocaine-macos/
+          cp build/release/bin/cocaine-wallet-cli cocaine-macos/
+          cp build/release/bin/cocaine-wallet-rpc cocaine-macos/
+          chmod +x cocaine-macos/*
+          tar -czvf cocaine-macos.tar.gz cocaine-macos/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cocaine-macos
+          path: cocaine-macos.tar.gz
+
+  create-release:
+    name: 'Create Release'
+    needs: [build-linux, build-windows, build-macos]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Get version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.version.outputs.version }}
+          name: COCAINE ${{ steps.version.outputs.version }}
+          body: |
+            ## Downloads
+
+            | Platform | Download |
+            |----------|----------|
+            | Windows x64 | `cocaine-windows-x64.zip` |
+            | Linux x64 | `cocaine-linux-x64.tar.gz` |
+            | macOS | `cocaine-macos.tar.gz` |
+
+            ## Quick Start
+
+            ### Windows
+            1. Download and extract `cocaine-windows-x64.zip`
+            2. Run `cocained.exe` to start the daemon
+            3. Run `cocaine-wallet-cli.exe` to manage your wallet
+
+            ### Linux
+            ```bash
+            tar -xzvf cocaine-linux-x64.tar.gz
+            cd cocaine-linux-x64
+            ./cocained --detach
+            ./cocaine-wallet-cli
+            ```
+
+            ### macOS
+            ```bash
+            tar -xzvf cocaine-macos.tar.gz
+            cd cocaine-macos
+            ./cocained --detach
+            ./cocaine-wallet-cli
+            ```
+
+            ## Network Info
+            - **Seed Node**: `34.32.101.141:19080`
+            - **P2P Port**: 19080
+            - **RPC Port**: 19081
+
+            ## Mining
+            ```bash
+            # Start daemon
+            ./cocained --detach
+
+            # Start mining (in wallet CLI)
+            ./cocaine-wallet-cli
+            > start_mining <threads>
+            ```
+          draft: false
+          prerelease: false
+          files: |
+            artifacts/cocaine-windows-x64/cocaine-windows-x64.zip
+            artifacts/cocaine-linux-x64/cocaine-linux-x64.tar.gz
+            artifacts/cocaine-macos/cocaine-macos.tar.gz
