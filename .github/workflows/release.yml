@@ -28,7 +28,7 @@ jobs:
           apt update
           apt -y install build-essential cmake git libboost-all-dev miniupnpc libunbound-dev \
             pkg-config libssl-dev libzmq3-dev libsodium-dev libhidapi-dev libusb-1.0-0-dev \
-            libprotobuf-dev protobuf-compiler curl
+            libprotobuf-dev protobuf-compiler curl libnettle-dev libgmp-dev
           # Install Rust
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
