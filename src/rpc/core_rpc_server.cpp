@@ -477,6 +477,12 @@ namespace cryptonote
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::check_core_ready()
   {
+    // Allow operations on fresh networks with no sync target
+    // This enables bootstrapping and mining on new networks
+    uint64_t target = m_core.get_target_blockchain_height();
+    if (target == 0) {
+      return true;  // Fresh network with no peers to sync from, allow mining
+    }
     if(!m_p2p.get_payload_object().is_synchronized())
     {
       return false;
