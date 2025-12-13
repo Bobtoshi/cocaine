@@ -210,7 +210,7 @@ jobs:
             ```
 
             ## Network Info
-            - **Seed Node**: `bore.pub:43111`
+            - **Seed Node**: `138.68.128.104:19080`
             - **P2P Port**: 19080
             - **RPC Port**: 19081
 
