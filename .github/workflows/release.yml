@@ -102,12 +102,19 @@ jobs:
           make -j$(nproc) daemon simplewallet wallet_rpc_server
 
       - name: Package binaries
+        shell: msys2 {0}
+        run: |
+          mkdir -p cocaine-windows-x64
+          cp build/release/bin/cocained.exe cocaine-windows-x64/
+          cp build/release/bin/cocaine-wallet-cli.exe cocaine-windows-x64/
+          cp build/release/bin/cocaine-wallet-rpc.exe cocaine-windows-x64/
+          # Copy required DLLs
+          ldd build/release/bin/cocained.exe | grep mingw64 | awk '{print $3}' | xargs -I {} cp {} cocaine-windows-x64/ 2>/dev/null || true
+          ldd build/release/bin/cocaine-wallet-cli.exe | grep mingw64 | awk '{print $3}' | xargs -I {} cp {} cocaine-windows-x64/ 2>/dev/null || true
+
+      - name: Create zip
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path cocaine-windows-x64
-          Copy-Item build/release/bin/cocained.exe cocaine-windows-x64/
-          Copy-Item build/release/bin/cocaine-wallet-cli.exe cocaine-windows-x64/
-          Copy-Item build/release/bin/cocaine-wallet-rpc.exe cocaine-windows-x64/
           Compress-Archive -Path cocaine-windows-x64/* -DestinationPath cocaine-windows-x64.zip
 
       - uses: actions/upload-artifact@v4
