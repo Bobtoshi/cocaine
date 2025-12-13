@@ -520,6 +520,19 @@ namespace nodetool
         return false;
     }
 
+    // Add Cocaine seed node as a priority peer for persistent connection
+    // (Seed nodes only share peer lists but don't maintain connections)
+    if (m_nettype == cryptonote::MAINNET)
+    {
+      const uint16_t default_port = cryptonote::get_config(m_nettype).P2P_DEFAULT_PORT;
+      expect<epee::net_utils::network_address> adr = net::get_network_address("138.68.128.104", default_port);
+      if (adr)
+      {
+        m_priority_peers.push_back(std::move(*adr));
+        MINFO("Added Cocaine seed node as priority peer: 138.68.128.104:19080");
+      }
+    }
+
     if (command_line::has_arg(vm, arg_p2p_seed_node))
     {
       boost::unique_lock<boost::shared_mutex> lock(public_zone.m_seed_nodes_lock);
