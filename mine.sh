@@ -5,40 +5,41 @@
 # Local mode (builds/starts local daemon + mines locally):
 #   ./mine.sh
 #
-# Remote mode (starts mining on a remote daemon RPC, e.g. VPS):
-#   ./mine.sh --remote <host:port> --address <WALLET_ADDRESS> [--threads N]
+# Solo mode (mine on THIS machine against a remote daemon RPC, e.g. your VPS):
+#   ./mine.sh --solo <host:port> --address <WALLET_ADDRESS> [--threads N]
 #
 # Notes:
-# - "start_mining" makes the *daemon host* mine. If you use --remote, the VPS CPU mines.
-# - If you want your client machine to do the hashing, use an external miner (e.g. xmrig) pointed at your VPS.
+# - --solo uses an external miner (XMRig) so your local CPU does the hashing.
+# - Your VPS daemon just provides block templates and accepts submissions.
+# - This does NOT make the VPS CPU mine.
 
 set -e
 
-REMOTE_RPC=""
-REMOTE_ADDRESS=""
-REMOTE_THREADS=""
+SOLO_RPC=""
+SOLO_ADDRESS=""
+SOLO_THREADS=""
 
 usage() {
   echo ""
   echo "Usage:"
   echo "  Local:  $0"
-  echo "  Remote: $0 --remote <host:port> --address <WALLET_ADDRESS> [--threads N]"
+  echo "  Solo:   $0 --solo <host:port> --address <WALLET_ADDRESS> [--threads N]"
   echo ""
   echo "Examples:"
   echo "  $0"
-  echo "  $0 --remote 1.2.3.4:19081 --address 5YourWalletAddressHere --threads 2"
+  echo "  $0 --solo 1.2.3.4:19081 --address 5YourWalletAddressHere --threads 2"
   echo ""
 }
 
 # Basic arg parsing
 while [ $# -gt 0 ]; do
   case "$1" in
-    --remote)
-      REMOTE_RPC="$2"; shift 2 ;;
+    --solo)
+      SOLO_RPC="$2"; shift 2 ;;
     --address)
-      REMOTE_ADDRESS="$2"; shift 2 ;;
+      SOLO_ADDRESS="$2"; shift 2 ;;
     --threads)
-      REMOTE_THREADS="$2"; shift 2 ;;
+      SOLO_THREADS="$2"; shift 2 ;;
     -h|--help)
       usage; exit 0 ;;
     *)
@@ -64,61 +65,173 @@ DATA_DIR="$SCRIPT_DIR/blockchain"
 WALLET_DIR="$SCRIPT_DIR/wallets"
 
 # ============================
-# Remote mode: mine on a remote daemon (e.g. VPS)
+# Solo mode: mine on THIS machine against a remote daemon (e.g. VPS)
 # ============================
-if [ -n "$REMOTE_RPC" ] || [ -n "$REMOTE_ADDRESS" ] || [ -n "$REMOTE_THREADS" ]; then
-  if [ -z "$REMOTE_RPC" ] || [ -z "$REMOTE_ADDRESS" ]; then
-    echo "[!] Remote mode requires --remote <host:port> and --address <WALLET_ADDRESS>"
+if [ -n "$SOLO_RPC" ] || [ -n "$SOLO_ADDRESS" ] || [ -n "$SOLO_THREADS" ]; then
+  if [ -z "$SOLO_RPC" ] || [ -z "$SOLO_ADDRESS" ]; then
+    echo "[!] Solo mode requires --solo <host:port> and --address <WALLET_ADDRESS>"
     usage
     exit 2
   fi
 
+  if ! command -v curl >/dev/null 2>&1; then
+    echo "[!] curl is required for --solo mode."
+    echo "    - macOS: already installed"
+    echo "    - Ubuntu/Debian: sudo apt-get update && sudo apt-get install -y curl"
+    echo "    - Windows (Git Bash): install Git for Windows (includes curl)"
+    exit 1
+  fi
+
   # Default threads if not provided
-  if [ -z "$REMOTE_THREADS" ]; then
-    REMOTE_THREADS=2
+  if [ -z "$SOLO_THREADS" ]; then
+    # Use half cores by default (consistent with local mode)
+    TOTAL_CORES=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
+    SOLO_THREADS=$((TOTAL_CORES / 2))
+    if [ "$SOLO_THREADS" -lt 1 ]; then
+      SOLO_THREADS=1
+    fi
   fi
 
   echo ""
-  echo "[+] Remote mining request"
-  echo "    RPC:     $REMOTE_RPC"
-  echo "    Address: $REMOTE_ADDRESS"
-  echo "    Threads: $REMOTE_THREADS"
+  echo "[+] Solo mining (local CPU)"
+  echo "    Daemon RPC: $SOLO_RPC"
+  echo "    Address:    $SOLO_ADDRESS"
+  echo "    Threads:    $SOLO_THREADS"
   echo ""
 
-  # Quick connectivity check
-  if ! curl -fsS "http://$REMOTE_RPC/json_rpc" \
+  # Quick daemon reachability check
+  if ! curl -fsS "http://$SOLO_RPC/json_rpc" \
       -d '{"jsonrpc":"2.0","id":"0","method":"get_info"}' \
       -H "Content-Type: application/json" >/dev/null; then
-    echo "[!] Cannot reach remote daemon RPC at http://$REMOTE_RPC"
-    echo "[!] Ensure the daemon is started with external RPC enabled (e.g. --rpc-bind-ip 0.0.0.0 --confirm-external-bind)"
-    echo "[!] and that firewalls/security-groups allow inbound TCP on the RPC port."
+    echo "[!] Cannot reach daemon RPC at http://$SOLO_RPC"
+    echo "[!] Your VPS daemon must expose RPC to your network (preferably via VPN like Tailscale/WireGuard)."
+    echo "[!] If public, ensure --rpc-bind-ip 0.0.0.0 + firewall/security-group allow inbound TCP on the RPC port."
     exit 1
   fi
 
-  # Start mining on the remote daemon host
-  RESULT=$(curl -s "http://$REMOTE_RPC/start_mining" -d "{\
-    \"miner_address\": \"$REMOTE_ADDRESS\",\
-    \"threads_count\": $REMOTE_THREADS,\
-    \"do_background_mining\": false,\
-    \"ignore_battery\": true\
-  }" -H "Content-Type: application/json")
+  TOOLS_DIR="$SCRIPT_DIR/tools/xmrig"
+  mkdir -p "$TOOLS_DIR"
 
-  if echo "$RESULT" | grep -q '"status":"OK"'; then
-    echo "[+] Mining started on remote daemon host!"
-    echo ""
-    echo "[*] Remote mining status (Ctrl+C to exit monitoring):"
-    while true; do
-      STATUS=$(curl -s "http://$REMOTE_RPC/mining_status" || true)
-      SPEED=$(echo "$STATUS" | grep -o '"speed":[0-9]*' | cut -d: -f2)
-      HEIGHT=$(curl -s "http://$REMOTE_RPC/json_rpc" -d '{"jsonrpc":"2.0","id":"0","method":"get_info"}' -H "Content-Type: application/json" | grep -o '"height":[0-9]*' | cut -d: -f2)
-      printf "\r    Height: %-8s | Speed: %-6s H/s" "${HEIGHT:-?}" "${SPEED:-0}"
-      sleep 2
-    done
-  else
-    echo "[!] Failed to start remote mining: $RESULT"
-    echo "[!] Note: If your daemon is running with --restricted-rpc, it may block start_mining."
-    exit 1
+  OS="$(uname -s 2>/dev/null || echo Unknown)"
+  ARCH="$(uname -m 2>/dev/null || echo Unknown)"
+
+  # Determine xmrig binary name for this shell
+  XMRIG_BIN="$TOOLS_DIR/xmrig"
+  case "$OS" in
+    MINGW*|MSYS*|CYGWIN*)
+      XMRIG_BIN="$TOOLS_DIR/xmrig.exe" ;;
+  esac
+
+  download_xmrig() {
+    echo "[*] Downloading XMRig..."
+
+    # Determine asset pattern
+    ASSET_PATTERN=""
+    case "$OS" in
+      Darwin)
+        # Prefer macOS universal/arm64; fall back to x86_64 if needed
+        if echo "$ARCH" | grep -qiE 'arm|aarch64'; then
+          ASSET_PATTERN='xmrig-.*-macos-arm64\.tar\.gz'
+        else
+          ASSET_PATTERN='xmrig-.*-macos-x64\.tar\.gz'
+        fi
+        ;;
+      Linux)
+        if echo "$ARCH" | grep -qiE 'aarch64|arm64'; then
+          ASSET_PATTERN='xmrig-.*-linux-arm64\.tar\.gz'
+        else
+          ASSET_PATTERN='xmrig-.*-linux-x64\.tar\.gz'
+        fi
+        ;;
+      MINGW*|MSYS*|CYGWIN*)
+        ASSET_PATTERN='xmrig-.*-msvc-win64\.zip'
+        ;;
+      *)
+        echo "[!] Unsupported OS for auto-download: $OS"
+        echo "[!] Please download XMRig manually and place it at: $XMRIG_BIN"
+        return 1
+        ;;
+    esac
+
+    # Fetch latest release metadata (GitHub API)
+    JSON=$(curl -fsS https://api.github.com/repos/xmrig/xmrig/releases/latest) || return 1
+
+    # Extract the first matching browser_download_url
+    URL=$(echo "$JSON" | grep -Eo '"browser_download_url"\s*:\s*"[^"]+"' \
+      | sed 's/.*"\(https:[^"]\+\)"/\1/' \
+      | grep -E "$ASSET_PATTERN" \
+      | head -n 1)
+
+    if [ -z "$URL" ]; then
+      echo "[!] Could not find a matching XMRig release asset for $OS/$ARCH."
+      echo "[!] Please download XMRig manually and place it at: $XMRIG_BIN"
+      return 1
+    fi
+
+    TMP="$TOOLS_DIR/_xmrig_download"
+    rm -rf "$TMP"
+    mkdir -p "$TMP"
+
+    FILE="$TMP/asset"
+    curl -fL "$URL" -o "$FILE" || return 1
+
+    case "$URL" in
+      *.zip)
+        if ! command -v unzip >/dev/null 2>&1; then
+          echo "[!] unzip is required to extract XMRig on Windows/Git Bash."
+          echo "    Install it (e.g. via MSYS2) or download/extract XMRig manually."
+          return 1
+        fi
+        unzip -q "$FILE" -d "$TMP" || return 1
+        FOUND=$(find "$TMP" -type f -name 'xmrig.exe' | head -n 1)
+        if [ -z "$FOUND" ]; then
+          echo "[!] Extraction succeeded but xmrig.exe not found."
+          return 1
+        fi
+        cp "$FOUND" "$XMRIG_BIN" || return 1
+        ;;
+      *.tar.gz)
+        tar -xzf "$FILE" -C "$TMP" || return 1
+        FOUND=$(find "$TMP" -type f -name 'xmrig' | head -n 1)
+        if [ -z "$FOUND" ]; then
+          echo "[!] Extraction succeeded but xmrig not found."
+          return 1
+        fi
+        cp "$FOUND" "$XMRIG_BIN" || return 1
+        chmod +x "$XMRIG_BIN" || true
+        ;;
+      *)
+        echo "[!] Unknown archive format: $URL"
+        return 1
+        ;;
+    esac
+
+    echo "[+] XMRig installed at $XMRIG_BIN"
+    return 0
+  }
+
+  if [ ! -f "$XMRIG_BIN" ]; then
+    if ! download_xmrig; then
+      echo "[!] Failed to auto-install XMRig."
+      echo "[!] Manual install: download XMRig and place binary at: $XMRIG_BIN"
+      exit 1
+    fi
   fi
+
+  # Run xmrig in daemon mode (solo) against remote RPC
+  echo "[*] Starting XMRig (solo/daemon mode)..."
+  echo "    Tip: if Windows Defender flags it, you may need to allow it (miners are commonly false-positived)."
+  echo ""
+
+  "$XMRIG_BIN" \
+    -o "$SOLO_RPC" \
+    -u "$SOLO_ADDRESS" \
+    -p x \
+    --daemon \
+    --cpu \
+    --threads "$SOLO_THREADS"
+
+  exit 0
 fi
 
 # Check if binaries exist
@@ -152,7 +265,6 @@ else
         --log-level 1 \
         --rpc-bind-ip 127.0.0.1 \
         --rpc-bind-port 19081 \
-        --confirm-external-bind \
         --detach
 
     echo "[*] Waiting for daemon to start..."
