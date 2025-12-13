@@ -211,7 +211,7 @@ cd dashboard && rm -rf node_modules && npm install
 | Ticker | COCA |
 | Address Prefix | 5 |
 | Block Time | ~2 minutes |
-| Mining Algorithm | RandomX |
+| Mining Algorithm | CryptoNight |
 | Unlock Window | 60 blocks |
 | Max Supply | ~18.4 million |
 
