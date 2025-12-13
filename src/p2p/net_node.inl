@@ -731,7 +731,7 @@ namespace nodetool
     if (m_nettype == cryptonote::MAINNET)
     {
       // Cocaine seed nodes
-      full_addrs.insert("bore.pub:43111");
+      full_addrs.insert("138.68.128.104:19080");
     }
     return full_addrs;
   }
