@@ -932,12 +932,13 @@
         async function fetchMiningStatus() {
             try {
                 const res = await fetch('/api/miner/status');
+                if (!res.ok) throw new Error('Controller not available');
                 const data = await res.json();
                 if (data.running) {
                     document.getElementById('miningStatus').textContent = 'Mining';
                     document.getElementById('miningStatus').style.color = 'var(--accent)';
                     const speed = data.hashrate || 0;
-                    document.getElementById('yourHashrate').textContent = speed.toFixed(0);
+                    document.getElementById('yourHashrate').textContent = speed > 0 ? speed.toFixed(0) : '0';
                     document.getElementById('miningThreads').textContent = data.threads || 0;
                     
                     // Get difficulty from daemon for time estimate
@@ -971,8 +972,14 @@
                         const speed = data.speed || 0;
                         document.getElementById('yourHashrate').textContent = speed;
                         updateHashrateChart(speed);
+                    } else {
+                        document.getElementById('miningStatus').textContent = 'Not Mining';
+                        document.getElementById('miningStatus').style.color = 'var(--text-secondary)';
+                        document.getElementById('yourHashrate').textContent = '0';
                     }
-                } catch (e2) {}
+                } catch (e2) {
+                    // Silently fail if both methods fail
+                }
             }
         }
 

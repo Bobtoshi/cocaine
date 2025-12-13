@@ -1,5 +1,5 @@
 const express = require('express');
-const { spawn } = require('child_process');
+const { spawn, exec } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const fetch = require('node-fetch');
@@ -80,9 +80,10 @@ app.post('/daemon/start', async (req, res) => {
     }
 
     try {
-        // Kill any stale cocained processes
-        const { exec } = require('child_process');
-        exec('pkill -f "cocained.*blockchain" || true', () => {});
+        // Kill any stale cocained processes (Unix/Mac only)
+        if (process.platform !== 'win32') {
+            exec('pkill -f "cocained.*blockchain" || true', () => {});
+        }
 
         const logStream = fs.createWriteStream(DAEMON_LOG, { flags: 'a' });
         
@@ -145,9 +146,13 @@ app.post('/daemon/stop', async (req, res) => {
             } catch (e) {}
         }
         
-        // Also kill any cocained processes
-        const { exec } = require('child_process');
-        exec('pkill -f "cocained.*blockchain" || true', () => {});
+        // Also kill any cocained processes (Unix/Mac only)
+        if (process.platform !== 'win32') {
+            exec('pkill -f "cocained.*blockchain" || true', () => {});
+        } else {
+            // Windows: use taskkill
+            exec('taskkill /F /IM cocained.exe 2>nul || true', () => {});
+        }
         
         await new Promise(resolve => setTimeout(resolve, 2000));
         
@@ -183,13 +188,14 @@ app.get('/daemon/status', async (req, res) => {
         
         // Update tracked PID if we got response but don't have one
         if (!daemonPid) {
-            // Try to find the process
-            const { exec } = require('child_process');
-            exec('pgrep -f "cocained.*blockchain"', (err, stdout) => {
-                if (!err && stdout.trim()) {
-                    daemonPid = parseInt(stdout.trim());
-                }
-            });
+            // Try to find the process (Unix/Mac only)
+            if (process.platform !== 'win32') {
+                exec('pgrep -f "cocained.*blockchain"', (err, stdout) => {
+                    if (!err && stdout.trim()) {
+                        daemonPid = parseInt(stdout.trim());
+                    }
+                });
+            }
         }
         
         res.json({
@@ -253,14 +259,21 @@ app.post('/miner/start', async (req, res) => {
         // Find XMRig binary
         const xmrigPaths = [
             path.join(SCRIPT_DIR, 'xmrig'),
+            path.join(SCRIPT_DIR, 'xmrig.exe'),
             path.join(SCRIPT_DIR, 'tools', 'xmrig'),
+            path.join(SCRIPT_DIR, 'tools', 'xmrig.exe'),
             '/usr/local/bin/xmrig',
-            'xmrig' // In PATH
+            'xmrig', // In PATH
+            'xmrig.exe' // Windows PATH
         ];
 
         let xmrigBin = null;
         for (const xmrigPath of xmrigPaths) {
-            if (xmrigPath === 'xmrig' || fs.existsSync(xmrigPath)) {
+            if (xmrigPath === 'xmrig' || xmrigPath === 'xmrig.exe') {
+                // Assume it's in PATH if we get here
+                xmrigBin = xmrigPath;
+                break;
+            } else if (fs.existsSync(xmrigPath)) {
                 xmrigBin = xmrigPath;
                 break;
             }
