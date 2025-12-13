@@ -1685,11 +1685,14 @@ skip:
 
     // Mark as synchronized if we have peers and our height matches or exceeds target
     // This handles the case where a node only has incoming connections (e.g., seed node)
+    // or when target_height is 0 (already synced, no pending sync)
     if (!m_synchronized && m_p2p->get_public_connections_count() > 0)
     {
       uint64_t current_height = m_core.get_current_blockchain_height();
       uint64_t target_height = m_core.get_target_blockchain_height();
-      if (current_height >= target_height && target_height > 0)
+      // If target_height is 0, we're not actively syncing - consider synced if we have blocks
+      // If target_height > 0, check if we've reached it
+      if ((target_height == 0 && current_height > 1) || (current_height >= target_height && target_height > 0))
       {
         on_connection_synchronized();
       }
