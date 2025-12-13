@@ -477,17 +477,23 @@ namespace cryptonote
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::check_core_ready()
   {
-    // Allow operations on fresh networks with no sync target
-    // This enables bootstrapping and mining on new networks
-    uint64_t target = m_core.get_target_blockchain_height();
-    if (target == 0) {
-      return true;  // Fresh network with no peers to sync from, allow mining
-    }
-    if(!m_p2p.get_payload_object().is_synchronized())
+    // Check if synchronized with the network
+    if(m_p2p.get_payload_object().is_synchronized())
     {
-      return false;
+      return true;
     }
-    return true;
+
+    // Allow operations on fresh/bootstrap networks:
+    // - No sync target (no peers have told us about higher blocks)
+    // - AND we have at least 1 block (genesis exists)
+    // This enables mining on new networks while still requiring sync when peers exist
+    uint64_t target = m_core.get_target_blockchain_height();
+    uint64_t height = m_core.get_current_blockchain_height();
+    if (target == 0 && height >= 1) {
+      return true;  // Fresh network with no peers, allow mining
+    }
+
+    return false;
   }
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::add_host_fail(const connection_context *ctx, unsigned int score)
