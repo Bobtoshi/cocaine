@@ -62,10 +62,27 @@ The web interface lets you:
 
 ## Mining
 
+### Local Mining (Recommended)
+
+**IMPORTANT: Mining happens on YOUR machine, not on a remote server.**
+
 1. Open the dashboard at http://localhost:8080
 2. Create or restore a wallet
 3. Click "Start Mining"
 4. Rewards appear after 60 block confirmations (~2 hours)
+
+**On Mac/Linux:** Use `./mine.sh` to start a local daemon that syncs from the seed node and mines locally.
+
+### Remote Mining: DO NOT USE `start_mining` on Remote Daemons
+
+**⚠️ CRITICAL:** The `start_mining` RPC command mines on the machine where the daemon runs. 
+
+- **DO NOT** use `start_mining` against a remote VPS/daemon - this mines on the VPS, not your machine
+- **DO** run your own local daemon and use `start_mining` against `127.0.0.1:19081`
+- **DO** connect your local daemon to the seed node (`138.68.128.104:19080`) for blockchain sync
+- For remote mining, use external miners (XMRig) in daemon/solo mode - see `tools/mine_remote.md`
+
+**VPS RPC Security:** The VPS RPC port (19081) may be bound to `127.0.0.1` only for safety. This prevents remote mining abuse.
 
 ## Network Info
 
@@ -100,6 +117,8 @@ The web interface lets you:
 **Not syncing?**
 - The daemon connects to seed node automatically
 - Wait for blockchain to download on first run
+- On Mac/Linux, ensure `./mine.sh` shows peers > 0
+- If peers = 0, check that seed node `138.68.128.104:19080` is reachable
 
 **Mining rewards not showing?**
 - Rewards are locked for 60 blocks (~2 hours)

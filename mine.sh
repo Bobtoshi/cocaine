@@ -46,17 +46,46 @@ check_daemon() {
     curl -s --max-time 3 "$DAEMON_URL/json_rpc" -d '{"jsonrpc":"2.0","id":"0","method":"get_info"}' -H "Content-Type: application/json" 2>/dev/null | grep -q '"status":"OK"'
 }
 
+# Function to check daemon status and warn if peers are 0
+check_daemon_status() {
+    INFO=$(curl -s --max-time 3 "$DAEMON_URL/get_info" 2>/dev/null)
+    if [ -z "$INFO" ]; then
+        return 1
+    fi
+    
+    HEIGHT=$(echo "$INFO" | python3 -c "import sys,json; print(json.load(sys.stdin).get('height', 0))" 2>/dev/null || echo "0")
+    SYNCED=$(echo "$INFO" | python3 -c "import sys,json; print(json.load(sys.stdin).get('synchronized', False))" 2>/dev/null || echo "False")
+    OUTGOING=$(echo "$INFO" | python3 -c "import sys,json; print(json.load(sys.stdin).get('outgoing_connections_count', 0))" 2>/dev/null || echo "0")
+    INCOMING=$(echo "$INFO" | python3 -c "import sys,json; print(json.load(sys.stdin).get('incoming_connections_count', 0))" 2>/dev/null || echo "0")
+    TOTAL_PEERS=$((OUTGOING + INCOMING))
+    
+    echo "[*] Status check:"
+    echo "    Height: $HEIGHT"
+    echo "    Synced: $SYNCED"
+    echo "    Peers: $TOTAL_PEERS (outgoing: $OUTGOING, incoming: $INCOMING)"
+    
+    if [ "$TOTAL_PEERS" -eq 0 ]; then
+        echo "[!] WARNING: No peers connected!"
+        echo "[!] The daemon may not be able to sync properly."
+        echo "[!] Check network connectivity to seed node: $SEED_NODE"
+        return 1
+    fi
+    
+    return 0
+}
+
 # Check if local daemon is running
 if check_daemon; then
     echo "[+] Local daemon already running"
 else
     echo "[*] Starting local daemon (this will sync from VPS seed node)..."
-    
+
     # Kill any stale process
     pkill -f cocained 2>/dev/null || true
     sleep 2
 
     # Start local daemon with seed node
+    # Use --add-peer instead of --add-exclusive-node for better connectivity
     "$DAEMON" \
         --data-dir "$DATA_DIR" \
         --log-level 1 \
@@ -64,13 +93,22 @@ else
         --rpc-bind-port 19081 \
         --p2p-bind-ip 127.0.0.1 \
         --p2p-bind-port 19080 \
-        --add-exclusive-node "$SEED_NODE" \
+        --add-peer "$SEED_NODE" \
         --detach
 
     echo "[*] Waiting for daemon to start and connect to seed node..."
     for i in {1..60}; do
         if check_daemon; then
             echo "[+] Local daemon started successfully"
+            echo "[*] Waiting for peer connection..."
+            sleep 3
+            # Check if we have peers
+            if check_daemon_status; then
+                echo "[+] Connected to network!"
+            else
+                echo "[!] Warning: No peers yet, but daemon is running"
+                echo "[*] It may take a minute to establish peer connections"
+            fi
             echo "[*] Syncing blockchain from seed node (this may take a while)..."
             break
         fi
@@ -83,14 +121,32 @@ else
     fi
 fi
 
+# Check status after daemon is running
+echo ""
+check_daemon_status || true
+
 # Get daemon status
 echo ""
 INFO=$(curl -s "$DAEMON_URL/get_info")
-HEIGHT=$(echo "$INFO" | grep -o '"height":[0-9]*' | cut -d: -f2)
+HEIGHT=$(echo "$INFO" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('height', 0))" 2>/dev/null || echo "0")
 BUSY=$(echo "$INFO" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('busy_syncing', False))" 2>/dev/null || echo "false")
 SYNCED=$(echo "$INFO" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('synchronized', False))" 2>/dev/null || echo "false")
+OUTGOING=$(echo "$INFO" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('outgoing_connections_count', 0))" 2>/dev/null || echo "0")
+INCOMING=$(echo "$INFO" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('incoming_connections_count', 0))" 2>/dev/null || echo "0")
+TOTAL_PEERS=$((OUTGOING + INCOMING))
 
 echo "[+] Current block height: $HEIGHT"
+echo "[+] Network peers: $TOTAL_PEERS (outgoing: $OUTGOING, incoming: $INCOMING)"
+
+if [ "$TOTAL_PEERS" -eq 0 ]; then
+    echo "[!] WARNING: No peers connected! Mining may not work properly."
+    echo "[!] The daemon needs peers to stay in sync with the network."
+    read -p "[?] Continue anyway? (y/n) [n]: " CONTINUE
+    if [ "$CONTINUE" != "y" ] && [ "$CONTINUE" != "Y" ]; then
+        echo "[*] Waiting for peer connections. Check again in a minute."
+        exit 0
+    fi
+fi
 
 if [ "$BUSY" = "True" ] || [ "$SYNCED" != "True" ]; then
     echo "[*] Blockchain is still syncing from seed node..."
