@@ -1682,6 +1682,19 @@ skip:
     m_idle_peer_kicker.do_call(boost::bind(&t_cryptonote_protocol_handler<t_core>::kick_idle_peers, this));
     m_standby_checker.do_call(boost::bind(&t_cryptonote_protocol_handler<t_core>::check_standby_peers, this));
     m_sync_search_checker.do_call(boost::bind(&t_cryptonote_protocol_handler<t_core>::update_sync_search, this));
+
+    // Mark as synchronized if we have peers and our height matches or exceeds target
+    // This handles the case where a node only has incoming connections (e.g., seed node)
+    if (!m_synchronized && m_p2p->get_public_connections_count() > 0)
+    {
+      uint64_t current_height = m_core.get_current_blockchain_height();
+      uint64_t target_height = m_core.get_target_blockchain_height();
+      if (current_height >= target_height && target_height > 0)
+      {
+        on_connection_synchronized();
+      }
+    }
+
     return m_core.on_idle();
   }
   //------------------------------------------------------------------------------------------------------------------------
