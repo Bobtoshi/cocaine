@@ -180,7 +180,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: cocaine-desktop-windows
-          path: desktop-app/dist/*.exe
+          path: desktop-app/dist/*.zip
 
   create-release:
     name: 'Create Release'
@@ -262,4 +262,4 @@ jobs:
             artifacts/cocaine-windows-x64/cocaine-windows-x64.zip
             artifacts/cocaine-linux-x64/cocaine-linux-x64.tar.gz
             artifacts/cocaine-macos/cocaine-macos.tar.gz
-            artifacts/cocaine-desktop-windows/*.exe
+            artifacts/cocaine-desktop-windows/*.zip
