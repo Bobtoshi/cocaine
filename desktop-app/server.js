@@ -410,7 +410,38 @@ app.post('/api/wallet/send', async (req, res) => {
             params.payment_id = payment_id;
         }
 
-        const data = await walletRpc('transfer', params);
+        let data = await walletRpc('transfer', params);
+
+        // Auto-consolidate if not enough outputs
+        if (data.error && data.error.message &&
+            (data.error.message.includes('not enough outputs') ||
+             data.error.message.includes('sweep_dust'))) {
+            console.log('[*] Not enough outputs, auto-consolidating...');
+
+            // Get our address for sweep_all
+            const addrData = await walletRpc('get_address');
+            const myAddress = addrData.result?.address;
+
+            if (myAddress) {
+                // Run sweep_all to consolidate outputs
+                const sweepData = await walletRpc('sweep_all', {
+                    address: myAddress,
+                    priority: 1,
+                    ring_size: 16
+                });
+
+                if (sweepData.result) {
+                    return res.json({
+                        success: false,
+                        consolidating: true,
+                        error: 'Outputs are being consolidated. Please wait for confirmation (~2 min) then try again.',
+                        tx_hash_list: sweepData.result.tx_hash_list
+                    });
+                }
+            }
+
+            return res.json({ success: false, error: data.error.message });
+        }
 
         if (data.error) {
             return res.json({ success: false, error: data.error.message });
