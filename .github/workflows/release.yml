@@ -49,14 +49,30 @@ jobs:
           cmake -D ARCH="default" -D CMAKE_BUILD_TYPE=Release ../..
           make -j$(nproc) daemon simplewallet wallet_rpc_server
 
-      - name: Package binaries
+      - name: Package binaries with web app
         shell: bash
         run: |
-          mkdir -p cocaine-linux-x64
-          cp build/release/bin/cocained cocaine-linux-x64/
-          cp build/release/bin/cocaine-wallet-cli cocaine-linux-x64/
-          cp build/release/bin/cocaine-wallet-rpc cocaine-linux-x64/
-          chmod +x cocaine-linux-x64/*
+          mkdir -p cocaine-linux-x64/bin
+          cp build/release/bin/cocained cocaine-linux-x64/bin/
+          cp build/release/bin/cocaine-wallet-cli cocaine-linux-x64/bin/
+          cp build/release/bin/cocaine-wallet-rpc cocaine-linux-x64/bin/
+          chmod +x cocaine-linux-x64/bin/*
+          # Copy web app
+          cp desktop-app/server.js cocaine-linux-x64/
+          cp desktop-app/package.json cocaine-linux-x64/
+          cp -r desktop-app/public cocaine-linux-x64/
+          # Create start script
+          cat > cocaine-linux-x64/start.sh << 'EOF'
+          #!/bin/bash
+          cd "$(dirname "$0")"
+          echo "Starting COCAINE daemon..."
+          ./bin/cocained --data-dir ~/.cocaine --add-priority-node 138.68.128.104:19080 --non-interactive &
+          sleep 5
+          echo "Starting web interface..."
+          npm install --production 2>/dev/null
+          node server.js
+          EOF
+          chmod +x cocaine-linux-x64/start.sh
           tar -czvf cocaine-linux-x64.tar.gz cocaine-linux-x64/
 
       - uses: actions/upload-artifact@v4
@@ -101,20 +117,34 @@ jobs:
           cmake -G "MSYS Makefiles" -D STATIC=ON -D ARCH="default" -D CMAKE_BUILD_TYPE=Release ../..
           make -j$(nproc) daemon simplewallet wallet_rpc_server
 
-      - name: Package binaries
+      - name: Package binaries with web app
         shell: msys2 {0}
         run: |
-          mkdir -p cocaine-windows-x64
-          cp build/release/bin/cocained.exe cocaine-windows-x64/
-          cp build/release/bin/cocaine-wallet-cli.exe cocaine-windows-x64/
-          cp build/release/bin/cocaine-wallet-rpc.exe cocaine-windows-x64/
+          mkdir -p cocaine-windows-x64/bin
+          cp build/release/bin/cocained.exe cocaine-windows-x64/bin/
+          cp build/release/bin/cocaine-wallet-cli.exe cocaine-windows-x64/bin/
+          cp build/release/bin/cocaine-wallet-rpc.exe cocaine-windows-x64/bin/
           # Copy required DLLs
-          ldd build/release/bin/cocained.exe | grep mingw64 | awk '{print $3}' | xargs -I {} cp {} cocaine-windows-x64/ 2>/dev/null || true
-          ldd build/release/bin/cocaine-wallet-cli.exe | grep mingw64 | awk '{print $3}' | xargs -I {} cp {} cocaine-windows-x64/ 2>/dev/null || true
+          ldd build/release/bin/cocained.exe | grep mingw64 | awk '{print $3}' | xargs -I {} cp {} cocaine-windows-x64/bin/ 2>/dev/null || true
+          ldd build/release/bin/cocaine-wallet-cli.exe | grep mingw64 | awk '{print $3}' | xargs -I {} cp {} cocaine-windows-x64/bin/ 2>/dev/null || true
+          # Copy web app
+          cp desktop-app/server.js cocaine-windows-x64/
+          cp desktop-app/package.json cocaine-windows-x64/
+          cp -r desktop-app/public cocaine-windows-x64/
 
-      - name: Create zip
+      - name: Create start script and zip
         shell: pwsh
         run: |
+          @"
+          @echo off
+          cd /d "%~dp0"
+          echo Starting COCAINE daemon...
+          start /b bin\cocained.exe --data-dir %APPDATA%\cocaine --add-priority-node 138.68.128.104:19080 --non-interactive
+          timeout /t 5 /nobreak > nul
+          echo Starting web interface...
+          npm install --production 2>nul
+          node server.js
+          "@ | Out-File -FilePath cocaine-windows-x64\start.bat -Encoding ASCII
           Compress-Archive -Path cocaine-windows-x64/* -DestinationPath cocaine-windows-x64.zip
 
       - uses: actions/upload-artifact@v4
@@ -142,13 +172,29 @@ jobs:
           cmake -D ARCH="default" -D CMAKE_BUILD_TYPE=Release ../..
           make -j$(sysctl -n hw.logicalcpu) daemon simplewallet wallet_rpc_server
 
-      - name: Package binaries
+      - name: Package binaries with web app
         run: |
-          mkdir -p cocaine-macos
-          cp build/release/bin/cocained cocaine-macos/
-          cp build/release/bin/cocaine-wallet-cli cocaine-macos/
-          cp build/release/bin/cocaine-wallet-rpc cocaine-macos/
-          chmod +x cocaine-macos/*
+          mkdir -p cocaine-macos/bin
+          cp build/release/bin/cocained cocaine-macos/bin/
+          cp build/release/bin/cocaine-wallet-cli cocaine-macos/bin/
+          cp build/release/bin/cocaine-wallet-rpc cocaine-macos/bin/
+          chmod +x cocaine-macos/bin/*
+          # Copy web app
+          cp desktop-app/server.js cocaine-macos/
+          cp desktop-app/package.json cocaine-macos/
+          cp -r desktop-app/public cocaine-macos/
+          # Create start script
+          cat > cocaine-macos/start.command << 'EOF'
+          #!/bin/bash
+          cd "$(dirname "$0")"
+          echo "Starting COCAINE daemon..."
+          ./bin/cocained --data-dir ~/.cocaine --add-priority-node 138.68.128.104:19080 --non-interactive &
+          sleep 5
+          echo "Starting web interface..."
+          npm install --production 2>/dev/null
+          node server.js
+          EOF
+          chmod +x cocaine-macos/start.command
           tar -czvf cocaine-macos.tar.gz cocaine-macos/
 
       - uses: actions/upload-artifact@v4
@@ -156,35 +202,9 @@ jobs:
           name: cocaine-macos
           path: cocaine-macos.tar.gz
 
-  build-desktop-windows:
-    name: 'Desktop App (Windows)'
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install dependencies and build
-        shell: pwsh
-        run: |
-          cd desktop-app
-          npm install
-          npm run build:win
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: cocaine-desktop-windows
-          path: desktop-app/dist/*.zip
-
   create-release:
     name: 'Create Release'
-    needs: [build-linux, build-windows, build-macos, build-desktop-windows]
+    needs: [build-linux, build-windows, build-macos]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -219,47 +239,36 @@ jobs:
             | Linux x64 | `cocaine-linux-x64.tar.gz` |
             | macOS | `cocaine-macos.tar.gz` |
 
-            ## Quick Start
+            ## Quick Start (Web App)
+
+            **Requires Node.js** - Download from https://nodejs.org
 
             ### Windows
-            1. Download and extract `cocaine-windows-x64.zip`
-            2. Run `cocained.exe` to start the daemon
-            3. Run `cocaine-wallet-cli.exe` to manage your wallet
+            1. Extract `cocaine-windows-x64.zip`
+            2. Double-click `start.bat`
+            3. Open http://localhost:8080
 
             ### Linux
             ```bash
             tar -xzvf cocaine-linux-x64.tar.gz
             cd cocaine-linux-x64
-            ./cocained --detach
-            ./cocaine-wallet-cli
+            ./start.sh
             ```
 
             ### macOS
             ```bash
             tar -xzvf cocaine-macos.tar.gz
             cd cocaine-macos
-            ./cocained --detach
-            ./cocaine-wallet-cli
+            ./start.command
             ```
 
             ## Network Info
             - **Seed Node**: `138.68.128.104:19080`
             - **P2P Port**: 19080
             - **RPC Port**: 19081
-
-            ## Mining
-            ```bash
-            # Start daemon
-            ./cocained --detach
-
-            # Start mining (in wallet CLI)
-            ./cocaine-wallet-cli
-            > start_mining <threads>
-            ```
           draft: false
           prerelease: false
           files: |
             artifacts/cocaine-windows-x64/cocaine-windows-x64.zip
             artifacts/cocaine-linux-x64/cocaine-linux-x64.tar.gz
             artifacts/cocaine-macos/cocaine-macos.tar.gz
-            artifacts/cocaine-desktop-windows/*.zip
