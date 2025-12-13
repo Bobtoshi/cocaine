@@ -156,9 +156,35 @@ jobs:
           name: cocaine-macos
           path: cocaine-macos.tar.gz
 
+  build-desktop-windows:
+    name: 'Desktop App (Windows)'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies and build
+        shell: pwsh
+        run: |
+          cd desktop-app
+          npm install
+          npm run build:win
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cocaine-desktop-windows
+          path: desktop-app/dist/*.exe
+
   create-release:
     name: 'Create Release'
-    needs: [build-linux, build-windows, build-macos]
+    needs: [build-linux, build-windows, build-macos, build-desktop-windows]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -236,3 +262,4 @@ jobs:
             artifacts/cocaine-windows-x64/cocaine-windows-x64.zip
             artifacts/cocaine-linux-x64/cocaine-linux-x64.tar.gz
             artifacts/cocaine-macos/cocaine-macos.tar.gz
+            artifacts/cocaine-desktop-windows/*.exe
