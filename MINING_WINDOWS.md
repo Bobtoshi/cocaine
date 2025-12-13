@@ -6,7 +6,10 @@
 
 ## Quick Start
 
-1. **Download the Windows binaries** (or build from source)
+1. **Download the pre-built Windows binaries** (NO COMPILATION NEEDED!)
+   - Go to: https://github.com/Bobtoshi/cocaine/releases/latest
+   - Download: `cocaine-windows-x64.zip`
+   - Extract to a folder (e.g., `C:\cocaine`)
 
 2. **Start your local daemon** with the seed node:
    ```cmd
