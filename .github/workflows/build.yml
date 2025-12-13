@@ -2,13 +2,23 @@ name: ci/gh-actions/cli
 
 on:
   push:
+    branches:
+      - main
     paths-ignore:
       - 'docs/**'
       - '**/README.md'
+      - '*.md'
+      - '.github/**'
+      - 'mine.sh'
+      - 'MINING_WINDOWS.md'
   pull_request:
     paths-ignore:
       - 'docs/**'
       - '**/README.md'
+      - '*.md'
+      - '.github/**'
+      - 'mine.sh'
+      - 'MINING_WINDOWS.md'
 
 # The below variables reduce repetitions across similar targets
 env:

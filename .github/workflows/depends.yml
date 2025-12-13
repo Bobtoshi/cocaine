@@ -2,13 +2,23 @@ name: ci/gh-actions/depends
 
 on:
   push:
+    branches:
+      - main
     paths-ignore:
       - 'docs/**'
       - '**/README.md'
+      - '*.md'
+      - '.github/**'
+      - 'mine.sh'
+      - 'MINING_WINDOWS.md'
   pull_request:
     paths-ignore:
       - 'docs/**'
       - '**/README.md'
+      - '*.md'
+      - '.github/**'
+      - 'mine.sh'
+      - 'MINING_WINDOWS.md'
 
 env:
   APT_SET_CONF: |
