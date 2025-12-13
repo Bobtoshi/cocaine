@@ -365,14 +365,80 @@
             </div>
         </div>
 
+        <!-- Peer Connectivity Warning -->
+        <div id="peerWarning" class="warning-box hidden" style="margin-bottom: 20px;">
+            <strong>⚠️ Network Connection Warning</strong>
+            <p>No peers connected for 60+ seconds. The node may not be syncing with the network.</p>
+            <p style="font-size: 12px; margin-top: 8px;">Check that seed node 138.68.128.104:19080 is reachable and the daemon is running.</p>
+        </div>
+
         <!-- Tabs -->
         <div class="tab-buttons">
-            <button class="tab-btn active" onclick="showTab('wallet')">Wallet</button>
+            <button class="tab-btn active" onclick="showTab('node')">Node</button>
+            <button class="tab-btn" onclick="showTab('wallet')">Wallet</button>
             <button class="tab-btn" onclick="showTab('mining')">Mining</button>
             <button class="tab-btn" onclick="showTab('send')">Send</button>
             <button class="tab-btn" onclick="showTab('history')">History</button>
             <button class="tab-btn" onclick="showTab('network')">Network</button>
             <button class="tab-btn" onclick="showTab('explorer')">Explorer</button>
+        </div>
+
+        <!-- Node Tab -->
+        <div id="tab-node" class="tab-content">
+            <div class="grid">
+                <div class="card">
+                    <div class="card-title">Daemon Control</div>
+                    <div id="daemonStatus" class="stat-row">
+                        <span class="stat-label">Status</span>
+                        <span class="stat-value" id="daemonStatusValue">Checking...</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">PID</span>
+                        <span class="stat-value" id="daemonPid">--</span>
+                    </div>
+                    <div class="btn-group" style="margin-top: 15px;">
+                        <button class="btn btn-primary" onclick="startDaemon()">Start Node</button>
+                        <button class="btn btn-danger" onclick="stopDaemon()">Stop Node</button>
+                        <button class="btn btn-secondary" onclick="refreshDaemonStatus()">Refresh</button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-title">Network Status</div>
+                    <div class="stat-row">
+                        <span class="stat-label">Height</span>
+                        <span class="stat-value" id="nodeHeight">--</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Synced</span>
+                        <span class="stat-value" id="nodeSynced">--</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Peers</span>
+                        <span class="stat-value" id="nodePeers">0</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Outgoing</span>
+                        <span class="stat-value" id="nodeOutgoing">0</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Incoming</span>
+                        <span class="stat-value" id="nodeIncoming">0</span>
+                    </div>
+                    <div id="nodeWarning" class="warning-box hidden" style="margin-top: 15px;">
+                        <strong>⚠️ No Peers Connected</strong>
+                        <p style="font-size: 12px; margin-top: 5px;">The node cannot sync without peer connections. Check seed node connectivity.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card" style="margin-top: 20px;">
+                <div class="card-title">Daemon Logs</div>
+                <div style="background: var(--bg-secondary); border-radius: 8px; padding: 12px; max-height: 300px; overflow-y: auto; font-family: monospace; font-size: 11px;" id="daemonLogs">
+                    Loading logs...
+                </div>
+                <button class="btn btn-sm btn-secondary" style="margin-top: 10px;" onclick="refreshDaemonLogs()">Refresh Logs</button>
+            </div>
         </div>
 
         <!-- Wallet Tab -->
@@ -745,6 +811,35 @@
             if (tab === 'history' && walletOpen) loadTransfers();
             if (tab === 'explorer') refreshBlocks();
             if (tab === 'network') fetchNetworkInfo();
+            if (tab === 'node') {
+                refreshDaemonStatus();
+                refreshDaemonLogs();
+            }
+        }
+
+        // Peer connectivity tracking
+        let peerWarningTimer = null;
+        let zeroPeerStartTime = null;
+
+        // Check peer connectivity and show warning if peers=0 for 60s
+        function checkPeerConnectivity(peers) {
+            const warningEl = document.getElementById('peerWarning');
+            
+            if (peers === 0) {
+                if (zeroPeerStartTime === null) {
+                    zeroPeerStartTime = Date.now();
+                }
+                const elapsed = (Date.now() - zeroPeerStartTime) / 1000;
+                
+                if (elapsed >= 60) {
+                    warningEl.classList.remove('hidden');
+                } else {
+                    warningEl.classList.add('hidden');
+                }
+            } else {
+                zeroPeerStartTime = null;
+                warningEl.classList.add('hidden');
+            }
         }
 
         // Daemon info
@@ -775,6 +870,24 @@
                     document.getElementById('peerCount').textContent = totalPeers;
                     document.getElementById('inPeers').textContent = r.incoming_connections_count || 0;
                     document.getElementById('outPeers').textContent = r.outgoing_connections_count || 0;
+                    
+                    // Check peer connectivity and show warning
+                    checkPeerConnectivity(totalPeers);
+                    
+                    // Update node tab
+                    document.getElementById('nodeHeight').textContent = r.height.toLocaleString();
+                    document.getElementById('nodeSynced').textContent = r.synchronized ? 'Yes' : 'No';
+                    document.getElementById('nodePeers').textContent = totalPeers;
+                    document.getElementById('nodeOutgoing').textContent = r.outgoing_connections_count || 0;
+                    document.getElementById('nodeIncoming').textContent = r.incoming_connections_count || 0;
+                    
+                    // Show warning in node tab if peers = 0
+                    const nodeWarning = document.getElementById('nodeWarning');
+                    if (totalPeers === 0) {
+                        nodeWarning.classList.remove('hidden');
+                    } else {
+                        nodeWarning.classList.add('hidden');
+                    }
 
                     // Network tab
                     document.getElementById('netHeight').textContent = r.height.toLocaleString();
@@ -815,34 +928,52 @@
             } catch (e) {}
         }
 
-        // Mining status
+        // Mining status (from controller/XMRig)
         async function fetchMiningStatus() {
             try {
-                const res = await fetch('/api/mining_status');
+                const res = await fetch('/api/miner/status');
                 const data = await res.json();
-                if (data.active) {
+                if (data.running) {
                     document.getElementById('miningStatus').textContent = 'Mining';
                     document.getElementById('miningStatus').style.color = 'var(--accent)';
-                    const speed = data.speed || 0;
-                    document.getElementById('yourHashrate').textContent = speed;
-                    document.getElementById('miningThreads').textContent = data.threads_count;
-                    document.getElementById('blockReward').textContent = (data.block_reward / 1e12).toFixed(2) + ' COCA';
+                    const speed = data.hashrate || 0;
+                    document.getElementById('yourHashrate').textContent = speed.toFixed(0);
+                    document.getElementById('miningThreads').textContent = data.threads || 0;
+                    
+                    // Get difficulty from daemon for time estimate
+                    try {
+                        const daemonRes = await fetch('/api/info');
+                        const daemonData = await daemonRes.json();
+                        if (daemonData.result && speed > 0) {
+                            const difficulty = daemonData.result.difficulty || 0;
+                            const seconds = difficulty / speed;
+                            document.getElementById('timeToBlock').textContent = formatDuration(seconds);
+                            document.getElementById('blockReward').textContent = '35.15 COCA'; // Fixed reward
+                        }
+                    } catch (e) {}
 
                     // Update chart
                     updateHashrateChart(speed);
-
-                    // Estimate time to block
-                    if (speed > 0 && data.difficulty) {
-                        const seconds = data.difficulty / speed;
-                        document.getElementById('timeToBlock').textContent = formatDuration(seconds);
-                    }
                 } else {
                     document.getElementById('miningStatus').textContent = 'Not Mining';
                     document.getElementById('miningStatus').style.color = 'var(--text-secondary)';
                     document.getElementById('yourHashrate').textContent = '0';
                     document.getElementById('timeToBlock').textContent = '--';
                 }
-            } catch (e) {}
+            } catch (e) {
+                // Fallback to old method if controller not available
+                try {
+                    const res = await fetch('/api/mining_status');
+                    const data = await res.json();
+                    if (data.active) {
+                        document.getElementById('miningStatus').textContent = 'Mining';
+                        document.getElementById('miningStatus').style.color = 'var(--accent)';
+                        const speed = data.speed || 0;
+                        document.getElementById('yourHashrate').textContent = speed;
+                        updateHashrateChart(speed);
+                    }
+                } catch (e2) {}
+            }
         }
 
         function formatDuration(seconds) {
@@ -852,11 +983,82 @@
             return (seconds / 86400).toFixed(1) + 'd';
         }
 
-        // Start mining
+        // Daemon control functions
+        async function startDaemon() {
+            try {
+                const res = await fetch('/api/daemon/start', { method: 'POST' });
+                const data = await res.json();
+                if (data.status === 'OK') {
+                    alert('Daemon started!');
+                    setTimeout(refreshDaemonStatus, 2000);
+                } else if (data.status === 'busy') {
+                    alert('Daemon already running');
+                } else {
+                    alert('Error: ' + (data.error || data.message || 'Unknown'));
+                }
+            } catch (e) {
+                alert('Error: ' + e.message);
+            }
+        }
+
+        async function stopDaemon() {
+            if (!confirm('Stop the daemon? This will stop mining and syncing.')) return;
+            try {
+                const res = await fetch('/api/daemon/stop', { method: 'POST' });
+                const data = await res.json();
+                alert(data.message || 'Daemon stopped');
+                refreshDaemonStatus();
+            } catch (e) {
+                alert('Error: ' + e.message);
+            }
+        }
+
+        async function refreshDaemonStatus() {
+            try {
+                const res = await fetch('/api/daemon/status');
+                const data = await res.json();
+                if (data.running) {
+                    document.getElementById('daemonStatusValue').textContent = 'Running';
+                    document.getElementById('daemonStatusValue').style.color = 'var(--accent)';
+                    document.getElementById('daemonPid').textContent = data.pid || '--';
+                } else {
+                    document.getElementById('daemonStatusValue').textContent = 'Stopped';
+                    document.getElementById('daemonStatusValue').style.color = 'var(--text-secondary)';
+                    document.getElementById('daemonPid').textContent = '--';
+                }
+            } catch (e) {
+                document.getElementById('daemonStatusValue').textContent = 'Error';
+                document.getElementById('daemonStatusValue').style.color = 'var(--danger)';
+            }
+        }
+
+        async function refreshDaemonLogs() {
+            try {
+                const res = await fetch('/api/daemon/logs?lines=50');
+                const data = await res.json();
+                const logsEl = document.getElementById('daemonLogs');
+                logsEl.innerHTML = (data.logs || []).slice(-30).join('<br>');
+            } catch (e) {
+                document.getElementById('daemonLogs').textContent = 'Error loading logs';
+            }
+        }
+
+        // Start mining (via controller/XMRig)
         async function startMining() {
             const address = document.getElementById('miningAddress').value;
             const threads = parseInt(document.getElementById('miningThreadsSelect').value);
             if (!address) return alert('Enter mining address');
+
+            // Check if daemon is running first
+            try {
+                const daemonRes = await fetch('/api/daemon/status');
+                const daemonData = await daemonRes.json();
+                if (!daemonData.running) {
+                    return alert('Daemon not running. Please start the node first.');
+                }
+            } catch (e) {
+                return alert('Cannot check daemon status. Please ensure the node is running.');
+            }
 
             try {
                 const res = await fetch('/api/mining/start', {
@@ -865,26 +1067,33 @@
                     body: JSON.stringify({ address, threads })
                 });
                 const data = await res.json();
-                if (data.status === 'OK' || data.status === 'Already mining') {
-                    alert('Mining started!');
-                    // Save mining address
+                if (data.status === 'OK') {
+                    alert('Mining started with XMRig!');
                     localStorage.setItem('miningAddress', address);
                     fetchMiningStatus();
+                } else if (data.status === 'busy') {
+                    alert('Miner already running');
                 } else {
-                    alert('Error: ' + (data.status || data.error || 'Unknown'));
+                    alert('Error: ' + (data.error || data.message || 'Unknown'));
+                    if (data.install) {
+                        alert('Install info: ' + data.install);
+                    }
                 }
             } catch (e) {
                 alert('Error: ' + e.message);
             }
         }
 
-        // Stop mining
+        // Stop mining (via controller)
         async function stopMining() {
             try {
-                await fetch('/api/mining/stop', { method: 'POST' });
-                alert('Mining stopped');
+                const res = await fetch('/api/mining/stop', { method: 'POST' });
+                const data = await res.json();
+                alert(data.message || 'Mining stopped');
                 fetchMiningStatus();
-            } catch (e) {}
+            } catch (e) {
+                alert('Error: ' + e.message);
+            }
         }
 
         // Load wallet list
@@ -1226,6 +1435,7 @@
         fetchDaemonInfo();
         fetchMiningStatus();
         loadWalletList();
+        refreshDaemonStatus();
 
         // Load saved mining address
         const savedAddr = localStorage.getItem('miningAddress');
@@ -1235,6 +1445,7 @@
 
         setInterval(fetchDaemonInfo, 5000);
         setInterval(fetchMiningStatus, 3000);
+        setInterval(refreshDaemonStatus, 10000);
         setInterval(() => { if (walletOpen) refreshWallet(); }, 30000);
     </script>
 </body>

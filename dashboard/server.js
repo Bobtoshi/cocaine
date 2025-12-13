@@ -7,6 +7,7 @@ const fs = require('fs');
 
 const app = express();
 const PORT = 8080;
+const CONTROLLER_URL = 'http://127.0.0.1:8787';
 const DAEMON_RPC = 'http://127.0.0.1:19081/json_rpc';
 const DAEMON_HTTP = 'http://127.0.0.1:19081';
 const WALLET_RPC = 'http://127.0.0.1:19083/json_rpc';
@@ -96,13 +97,75 @@ function startWalletRpc() {
 
 // ==================== DAEMON ENDPOINTS ====================
 
-// Get daemon info
+// ==================== CONTROLLER PROXY ENDPOINTS ====================
+
+// Proxy daemon status (uses controller)
 app.get('/api/info', async (req, res) => {
     try {
+        // Try controller first
+        const controllerRes = await fetch(`${CONTROLLER_URL}/daemon/status`);
+        if (controllerRes.ok) {
+            const controllerData = await controllerRes.json();
+            if (controllerData.running) {
+                // Return in expected format
+                return res.json({ result: controllerData });
+            }
+        }
+        // Fallback to direct RPC
         const data = await daemonRpc('get_info');
         res.json(data);
     } catch (error) {
         res.status(500).json({ error: error.message, daemon_running: false });
+    }
+});
+
+// Start daemon (via controller)
+app.post('/api/daemon/start', async (req, res) => {
+    try {
+        const response = await fetch(`${CONTROLLER_URL}/daemon/start`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        const data = await response.json();
+        res.json(data);
+    } catch (error) {
+        res.status(500).json({ status: 'error', error: error.message });
+    }
+});
+
+// Stop daemon (via controller)
+app.post('/api/daemon/stop', async (req, res) => {
+    try {
+        const response = await fetch(`${CONTROLLER_URL}/daemon/stop`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        const data = await response.json();
+        res.json(data);
+    } catch (error) {
+        res.status(500).json({ status: 'error', error: error.message });
+    }
+});
+
+// Get daemon status (via controller)
+app.get('/api/daemon/status', async (req, res) => {
+    try {
+        const response = await fetch(`${CONTROLLER_URL}/daemon/status`);
+        const data = await response.json();
+        res.json(data);
+    } catch (error) {
+        res.status(500).json({ running: false, error: error.message });
+    }
+});
+
+// Get daemon logs
+app.get('/api/daemon/logs', async (req, res) => {
+    try {
+        const response = await fetch(`${CONTROLLER_URL}/daemon/logs?lines=${req.query.lines || 50}`);
+        const data = await response.json();
+        res.json(data);
+    } catch (error) {
+        res.status(500).json({ logs: [], error: error.message });
     }
 });
 
@@ -128,46 +191,93 @@ app.get('/api/block/:height', async (req, res) => {
     }
 });
 
-// Mining status
+// Mining status (proxy to controller)
 app.get('/api/mining_status', async (req, res) => {
     try {
-        const response = await fetch(`${DAEMON_HTTP}/mining_status`);
-        const data = await response.json();
-        res.json(data);
+        // Get miner status from controller
+        const minerRes = await fetch(`${CONTROLLER_URL}/miner/status`);
+        const minerData = await minerRes.json();
+        
+        if (minerData.running) {
+            // Get difficulty from daemon
+            const daemonRes = await fetch(`${DAEMON_HTTP}/get_info`);
+            const daemonData = await daemonRes.json();
+            
+            res.json({
+                active: true,
+                address: minerData.address,
+                threads_count: minerData.threads,
+                speed: minerData.hashrate,
+                status: 'OK',
+                difficulty: daemonData.difficulty || 0,
+                block_reward: 0 // Will be calculated
+            });
+        } else {
+            res.json({
+                active: false,
+                address: '',
+                threads_count: 0,
+                speed: 0,
+                status: 'OK'
+            });
+        }
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
 
-// Start mining
+// Start mining (via controller - uses XMRig)
 app.post('/api/mining/start', async (req, res) => {
     const { address, threads } = req.body;
     try {
-        const response = await fetch(`${DAEMON_HTTP}/start_mining`, {
+        const response = await fetch(`${CONTROLLER_URL}/miner/start`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                miner_address: address,
-                threads_count: threads || 2,
-                do_background_mining: false,
-                ignore_battery: true
+                address: address,
+                threads: threads || 2
             })
         });
         const data = await response.json();
         res.json(data);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ status: 'error', error: error.message });
     }
 });
 
-// Stop mining
+// Stop mining (via controller)
 app.post('/api/mining/stop', async (req, res) => {
     try {
-        const response = await fetch(`${DAEMON_HTTP}/stop_mining`, { method: 'POST' });
+        const response = await fetch(`${CONTROLLER_URL}/miner/stop`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
         const data = await response.json();
         res.json(data);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ status: 'error', error: error.message });
+    }
+});
+
+// Get miner status (via controller)
+app.get('/api/miner/status', async (req, res) => {
+    try {
+        const response = await fetch(`${CONTROLLER_URL}/miner/status`);
+        const data = await response.json();
+        res.json(data);
+    } catch (error) {
+        res.status(500).json({ running: false, error: error.message });
+    }
+});
+
+// Get miner logs
+app.get('/api/miner/logs', async (req, res) => {
+    try {
+        const response = await fetch(`${CONTROLLER_URL}/miner/logs?lines=${req.query.lines || 50}`);
+        const data = await response.json();
+        res.json(data);
+    } catch (error) {
+        res.status(500).json({ logs: [], error: error.message });
     }
 });
 
@@ -428,7 +538,24 @@ app.get('/api/wallet/status', async (req, res) => {
 
 // ==================== SERVER START ====================
 
-const server = app.listen(PORT, async () => {
+// Start controller in background
+let controllerProcess = null;
+function startController() {
+    const controllerPath = path.join(__dirname, 'controller.js');
+    if (fs.existsSync(controllerPath)) {
+        controllerProcess = spawn('node', [controllerPath], {
+            cwd: __dirname,
+            stdio: 'ignore',
+            detached: true
+        });
+        controllerProcess.unref();
+        console.log('[+] Controller started on port 8787');
+    } else {
+        console.log('[!] Controller not found, running without it');
+    }
+}
+
+const server = app.listen(PORT, '127.0.0.1', async () => {
     console.log(`
 ╔═══════════════════════════════════════════════════════════╗
 ║                                                           ║
@@ -443,12 +570,16 @@ const server = app.listen(PORT, async () => {
 ║                                                           ║
 ╚═══════════════════════════════════════════════════════════╝
 
-Dashboard running at http://localhost:${PORT}
+Dashboard running at http://127.0.0.1:${PORT}
+Controller: http://127.0.0.1:8787
 Daemon RPC: port 19081
 Wallet RPC: port 19083
 
 Press Ctrl+C to stop
 `);
+
+    // Start controller
+    startController();
 
     // Start wallet RPC
     try {
@@ -476,6 +607,9 @@ process.on('SIGINT', () => {
     console.log('\n[*] Shutting down...');
     if (walletRpcProcess) {
         walletRpcProcess.kill();
+    }
+    if (controllerProcess) {
+        controllerProcess.kill();
     }
     process.exit(0);
 });

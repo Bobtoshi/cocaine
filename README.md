@@ -62,27 +62,44 @@ The web interface lets you:
 
 ## Mining
 
-### Local Mining (Recommended)
+### Local Mining via Web Dashboard (Recommended)
 
-**IMPORTANT: Mining happens on YOUR machine, not on a remote server.**
+**IMPORTANT: All mining happens on YOUR machine, not on a remote server.**
 
-1. Open the dashboard at http://localhost:8080
-2. Create or restore a wallet
-3. Click "Start Mining"
-4. Rewards appear after 60 block confirmations (~2 hours)
+The dashboard uses a controller system that:
+- Starts a local daemon that syncs from the seed node (`138.68.128.104:19080`)
+- Uses XMRig for CPU mining (not the daemon's built-in miner)
+- Mines locally and submits work through your local daemon
 
-**On Mac/Linux:** Use `./mine.sh` to start a local daemon that syncs from the seed node and mines locally.
+**Steps:**
+1. Start the dashboard:
+   - **macOS:** `cd dashboard && ./start-mac.sh`
+   - **Windows:** `cd dashboard && powershell -ExecutionPolicy Bypass -File start-windows.ps1`
+   - **Linux:** `cd dashboard && npm start`
+2. Open http://localhost:8080 in your browser
+3. Go to the **Node** tab and click "Start Node" (waits for peers > 0)
+4. Go to the **Mining** tab, enter your wallet address, and click "Start Mining"
+5. XMRig will start mining on your machine
+
+**Requirements:**
+- Node.js installed (https://nodejs.org)
+- XMRig installed (download from https://github.com/xmrig/xmrig/releases)
+  - Place `xmrig` binary in the project root, or ensure it's in your PATH
+
+**Note:** The dashboard will show a warning if peers = 0 for 60+ seconds, indicating the node may not be syncing properly.
+
+### Alternative: Command Line Mining
+
+**On Mac/Linux:** Use `./mine.sh` to start a local daemon that syncs from the seed node and mines using the daemon's built-in miner.
 
 ### Remote Mining: DO NOT USE `start_mining` on Remote Daemons
 
 **⚠️ CRITICAL:** The `start_mining` RPC command mines on the machine where the daemon runs. 
 
 - **DO NOT** use `start_mining` against a remote VPS/daemon - this mines on the VPS, not your machine
-- **DO** run your own local daemon and use `start_mining` against `127.0.0.1:19081`
-- **DO** connect your local daemon to the seed node (`138.68.128.104:19080`) for blockchain sync
-- For remote mining, use external miners (XMRig) in daemon/solo mode - see `tools/mine_remote.md`
-
-**VPS RPC Security:** The VPS RPC port (19081) may be bound to `127.0.0.1` only for safety. This prevents remote mining abuse.
+- **DO** run your own local daemon and connect it to the seed node for sync
+- **DO** use XMRig (via dashboard controller) or the local daemon's miner for local mining
+- The VPS seed node is for blockchain synchronization only, not mining
 
 ## Network Info
 
