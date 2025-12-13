@@ -1,9 +1,50 @@
 #!/bin/bash
 
 # Cocaine Mining Setup Script
-# Run: ./mine.sh
+#
+# Local mode (builds/starts local daemon + mines locally):
+#   ./mine.sh
+#
+# Remote mode (starts mining on a remote daemon RPC, e.g. VPS):
+#   ./mine.sh --remote <host:port> --address <WALLET_ADDRESS> [--threads N]
+#
+# Notes:
+# - "start_mining" makes the *daemon host* mine. If you use --remote, the VPS CPU mines.
+# - If you want your client machine to do the hashing, use an external miner (e.g. xmrig) pointed at your VPS.
 
 set -e
+
+REMOTE_RPC=""
+REMOTE_ADDRESS=""
+REMOTE_THREADS=""
+
+usage() {
+  echo ""
+  echo "Usage:"
+  echo "  Local:  $0"
+  echo "  Remote: $0 --remote <host:port> --address <WALLET_ADDRESS> [--threads N]"
+  echo ""
+  echo "Examples:"
+  echo "  $0"
+  echo "  $0 --remote 1.2.3.4:19081 --address 5YourWalletAddressHere --threads 2"
+  echo ""
+}
+
+# Basic arg parsing
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --remote)
+      REMOTE_RPC="$2"; shift 2 ;;
+    --address)
+      REMOTE_ADDRESS="$2"; shift 2 ;;
+    --threads)
+      REMOTE_THREADS="$2"; shift 2 ;;
+    -h|--help)
+      usage; exit 0 ;;
+    *)
+      echo "[!] Unknown argument: $1"; usage; exit 2 ;;
+  esac
+done
 
 echo ""
 echo " ██████╗ ██████╗  ██████╗ █████╗ ██╗███╗   ██╗███████╗"
@@ -21,6 +62,64 @@ DAEMON="$SCRIPT_DIR/build/bin/cocained"
 WALLET_CLI="$SCRIPT_DIR/build/bin/cocaine-wallet-cli"
 DATA_DIR="$SCRIPT_DIR/blockchain"
 WALLET_DIR="$SCRIPT_DIR/wallets"
+
+# ============================
+# Remote mode: mine on a remote daemon (e.g. VPS)
+# ============================
+if [ -n "$REMOTE_RPC" ] || [ -n "$REMOTE_ADDRESS" ] || [ -n "$REMOTE_THREADS" ]; then
+  if [ -z "$REMOTE_RPC" ] || [ -z "$REMOTE_ADDRESS" ]; then
+    echo "[!] Remote mode requires --remote <host:port> and --address <WALLET_ADDRESS>"
+    usage
+    exit 2
+  fi
+
+  # Default threads if not provided
+  if [ -z "$REMOTE_THREADS" ]; then
+    REMOTE_THREADS=2
+  fi
+
+  echo ""
+  echo "[+] Remote mining request"
+  echo "    RPC:     $REMOTE_RPC"
+  echo "    Address: $REMOTE_ADDRESS"
+  echo "    Threads: $REMOTE_THREADS"
+  echo ""
+
+  # Quick connectivity check
+  if ! curl -fsS "http://$REMOTE_RPC/json_rpc" \
+      -d '{"jsonrpc":"2.0","id":"0","method":"get_info"}' \
+      -H "Content-Type: application/json" >/dev/null; then
+    echo "[!] Cannot reach remote daemon RPC at http://$REMOTE_RPC"
+    echo "[!] Ensure the daemon is started with external RPC enabled (e.g. --rpc-bind-ip 0.0.0.0 --confirm-external-bind)"
+    echo "[!] and that firewalls/security-groups allow inbound TCP on the RPC port."
+    exit 1
+  fi
+
+  # Start mining on the remote daemon host
+  RESULT=$(curl -s "http://$REMOTE_RPC/start_mining" -d "{\
+    \"miner_address\": \"$REMOTE_ADDRESS\",\
+    \"threads_count\": $REMOTE_THREADS,\
+    \"do_background_mining\": false,\
+    \"ignore_battery\": true\
+  }" -H "Content-Type: application/json")
+
+  if echo "$RESULT" | grep -q '"status":"OK"'; then
+    echo "[+] Mining started on remote daemon host!"
+    echo ""
+    echo "[*] Remote mining status (Ctrl+C to exit monitoring):"
+    while true; do
+      STATUS=$(curl -s "http://$REMOTE_RPC/mining_status" || true)
+      SPEED=$(echo "$STATUS" | grep -o '"speed":[0-9]*' | cut -d: -f2)
+      HEIGHT=$(curl -s "http://$REMOTE_RPC/json_rpc" -d '{"jsonrpc":"2.0","id":"0","method":"get_info"}' -H "Content-Type: application/json" | grep -o '"height":[0-9]*' | cut -d: -f2)
+      printf "\r    Height: %-8s | Speed: %-6s H/s" "${HEIGHT:-?}" "${SPEED:-0}"
+      sleep 2
+    done
+  else
+    echo "[!] Failed to start remote mining: $RESULT"
+    echo "[!] Note: If your daemon is running with --restricted-rpc, it may block start_mining."
+    exit 1
+  fi
+fi
 
 # Check if binaries exist
 if [ ! -f "$DAEMON" ]; then
@@ -51,7 +150,7 @@ else
     "$DAEMON" \
         --data-dir "$DATA_DIR" \
         --log-level 1 \
-        --rpc-bind-ip 0.0.0.0 \
+        --rpc-bind-ip 127.0.0.1 \
         --rpc-bind-port 19081 \
         --confirm-external-bind \
         --detach
