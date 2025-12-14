@@ -23,18 +23,16 @@ A privacy-focused cryptocurrency with peer-to-peer networking.
 
 ## Requirements
 
-- **Node.js** - Download from https://nodejs.org (required for web interface)
+- **Node.js** - Download from https://nodejs.org (required for web dashboard)
 
 ## Quick Start
 
 ### Windows
-
 1. Download and extract `cocaine-windows-x64.zip`
 2. Double-click `start.bat`
 3. Open http://localhost:8080 in your browser
 
 ### Linux
-
 ```bash
 tar -xzvf cocaine-linux-x64.tar.gz
 cd cocaine-linux-x64
@@ -43,7 +41,6 @@ cd cocaine-linux-x64
 Then open http://localhost:8080
 
 ### macOS
-
 ```bash
 tar -xzvf cocaine-macos.tar.gz
 cd cocaine-macos
@@ -53,53 +50,32 @@ Then open http://localhost:8080
 
 ## Web Dashboard
 
-The web interface lets you:
-- Create/restore wallets
-- View balance (locked & unlocked)
-- Start/stop mining
-- Send COCA
-- View transaction history
+The dashboard provides a complete interface for managing your COCA:
+
+### Features
+- **Dashboard Tab** - Live network map, hashrate charts, block times, mining stats
+- **Wallet Tab** - Create/restore wallets, view balance, send COCA, transaction history
+- **Mining Tab** - Start/stop mining with adjustable CPU threads, real-time hashrate
+- **Network Tab** - Connected peers, daemon status, sync progress
+- **Explorer Tab** - Browse recent blocks with rewards and difficulty
+
+### Dashboard Highlights
+- Global network map showing seed nodes, peers, and active miners
+- Real-time hashrate and block time charts
+- Live sync status and peer connections
+- No scrolling required - everything fits on screen
 
 ## Mining
 
-### Local Mining via Web Dashboard (Recommended)
+1. Start the dashboard (see Quick Start above)
+2. Go to **Wallet** tab and create or open a wallet
+3. Go to **Mining** tab
+4. Click "Use Wallet" to auto-fill your address
+5. Select CPU threads and click "Start Mining"
 
-**IMPORTANT: All mining happens on YOUR machine, not on a remote server.**
+Your mining progress appears on the network map as an orange dot!
 
-The dashboard uses a controller system that:
-- Starts a local daemon that syncs from the seed node (`138.68.128.104:19080`)
-- Uses XMRig for CPU mining (not the daemon's built-in miner)
-- Mines locally and submits work through your local daemon
-
-**Steps:**
-1. Start the dashboard:
-   - **macOS:** `cd dashboard && ./start-mac.sh`
-   - **Windows:** `cd dashboard && powershell -ExecutionPolicy Bypass -File start-windows.ps1`
-   - **Linux:** `cd dashboard && npm start`
-2. Open http://localhost:8080 in your browser
-3. Go to the **Node** tab and click "Start Node" (waits for peers > 0)
-4. Go to the **Mining** tab, enter your wallet address, and click "Start Mining"
-5. XMRig will start mining on your machine
-
-**Requirements:**
-- Node.js installed (https://nodejs.org)
-- XMRig installed (download from https://github.com/xmrig/xmrig/releases)
-  - Place `xmrig` binary in the project root, or ensure it's in your PATH
-
-**Note:** The dashboard will show a warning if peers = 0 for 60+ seconds, indicating the node may not be syncing properly.
-
-### Alternative: Command Line Mining
-
-**On Mac/Linux:** Use `./mine.sh` to start a local daemon that syncs from the seed node and mines using the daemon's built-in miner.
-
-### Remote Mining: DO NOT USE `start_mining` on Remote Daemons
-
-**⚠️ CRITICAL:** The `start_mining` RPC command mines on the machine where the daemon runs. 
-
-- **DO NOT** use `start_mining` against a remote VPS/daemon - this mines on the VPS, not your machine
-- **DO** run your own local daemon and connect it to the seed node for sync
-- **DO** use XMRig (via dashboard controller) or the local daemon's miner for local mining
-- The VPS seed node is for blockchain synchronization only, not mining
+**Note:** Mining rewards are locked for 60 blocks (~2 hours) before they become spendable.
 
 ## Network Info
 
@@ -123,7 +99,7 @@ The dashboard uses a controller system that:
 
 - **Save your seed phrase** - it's the only way to recover your wallet
 - Store it offline, never share it
-- Wallet files are in your data directory
+- Wallet files are stored locally on your machine
 
 ## Troubleshooting
 
@@ -132,14 +108,17 @@ The dashboard uses a controller system that:
 - Check that ports 8080 and 19081 aren't in use
 
 **Not syncing?**
-- The daemon connects to seed node automatically
+- The daemon connects to the seed node automatically
 - Wait for blockchain to download on first run
-- On Mac/Linux, ensure `./mine.sh` shows peers > 0
-- If peers = 0, check that seed node `138.68.128.104:19080` is reachable
+- Check Network tab for peer connections
 
-**Mining rewards not showing?**
+**Mining not starting?**
+- Ensure daemon shows "Synced" status in the header
+- Mining won't start until blockchain is synchronized
+
+**Rewards not showing?**
 - Rewards are locked for 60 blocks (~2 hours)
-- Check "Locked Balance" in dashboard
+- Check dashboard - locked vs unlocked balance
 
 ## Building from Source
 

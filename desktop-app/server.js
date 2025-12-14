@@ -362,6 +362,66 @@ app.get('/api/wallet/address', async (req, res) => {
     }
 });
 
+// Get connected peers/connections
+app.get('/api/connections', async (req, res) => {
+    try {
+        const response = await fetch(`${DAEMON_HTTP}/get_connections`);
+        const data = await response.json();
+        res.json(data);
+    } catch (error) {
+        res.status(500).json({ error: error.message, connections: [] });
+    }
+});
+
+// Get peer list
+app.get('/api/peers', async (req, res) => {
+    try {
+        const response = await fetch(`${DAEMON_HTTP}/get_peer_list`);
+        const data = await response.json();
+        res.json(data);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get block count
+app.get('/api/block_count', async (req, res) => {
+    try {
+        const data = await daemonRpc('get_block_count');
+        res.json(data);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get coinbase tx sum (total coins mined)
+app.get('/api/coinbase_tx_sum', async (req, res) => {
+    try {
+        const data = await daemonRpc('get_coinbase_tx_sum', {
+            height: 0,
+            count: 999999
+        });
+        res.json(data);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get multiple block headers for chart data
+app.get('/api/blocks_range/:start/:end', async (req, res) => {
+    try {
+        const start = parseInt(req.params.start);
+        const end = parseInt(req.params.end);
+        const data = await daemonRpc('get_block_headers_range', {
+            start_height: start,
+            end_height: end
+        });
+        res.json(data);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Get transaction history
 app.get('/api/wallet/transfers', async (req, res) => {
     try {
