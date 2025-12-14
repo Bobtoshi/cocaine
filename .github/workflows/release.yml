@@ -66,7 +66,7 @@ jobs:
           #!/bin/bash
           cd "$(dirname "$0")"
           echo "Starting COCAINE daemon..."
-          ./bin/cocained --data-dir ~/.cocaine --add-priority-node 138.68.128.104:19080 --non-interactive &
+          ./bin/cocained --data-dir ~/.cocaine --rpc-bind-ip 127.0.0.1 --rpc-bind-port 19081 --p2p-bind-port 19080 --add-priority-node 138.68.128.104:19080 --non-interactive &
           sleep 5
           echo "Starting web interface..."
           npm install --production 2>/dev/null
@@ -139,7 +139,7 @@ jobs:
           @echo off
           cd /d "%~dp0"
           echo Starting COCAINE daemon...
-          start /b bin\cocained.exe --data-dir %APPDATA%\cocaine --add-priority-node 138.68.128.104:19080 --non-interactive
+          start /b bin\cocained.exe --data-dir %APPDATA%\cocaine --rpc-bind-ip 127.0.0.1 --rpc-bind-port 19081 --p2p-bind-port 19080 --add-priority-node 138.68.128.104:19080 --non-interactive
           timeout /t 5 /nobreak > nul
           echo Starting web interface...
           npm install --production 2>nul
@@ -188,7 +188,7 @@ jobs:
           #!/bin/bash
           cd "$(dirname "$0")"
           echo "Starting COCAINE daemon..."
-          ./bin/cocained --data-dir ~/.cocaine --add-priority-node 138.68.128.104:19080 --non-interactive &
+          ./bin/cocained --data-dir ~/.cocaine --rpc-bind-ip 127.0.0.1 --rpc-bind-port 19081 --p2p-bind-port 19080 --add-priority-node 138.68.128.104:19080 --non-interactive &
           sleep 5
           echo "Starting web interface..."
           npm install --production 2>/dev/null
