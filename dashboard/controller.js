@@ -331,12 +331,15 @@ app.post('/miner/start', async (req, res) => {
         const configPath = path.join(LOG_DIR, 'xmrig-config.json');
         fs.writeFileSync(configPath, JSON.stringify(xmrigConfig, null, 2));
 
-        const logStream = fs.createWriteStream(MINER_LOG, { flags: 'a' });
-
         minerProcess = spawn(xmrigBin, ['--config', configPath], {
             cwd: SCRIPT_DIR,
-            stdio: ['ignore', logStream, logStream]
+            stdio: ['ignore', 'pipe', 'pipe']
         });
+
+        // Pipe output to log file
+        const logStream = fs.createWriteStream(MINER_LOG, { flags: 'a' });
+        minerProcess.stdout.pipe(logStream);
+        minerProcess.stderr.pipe(logStream);
 
         minerPid = minerProcess.pid;
         minerConfig = { address, threads: threads || 2 };
