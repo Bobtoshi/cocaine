@@ -397,9 +397,14 @@ app.get('/api/block_count', async (req, res) => {
 // Get coinbase tx sum (total coins mined)
 app.get('/api/coinbase_tx_sum', async (req, res) => {
     try {
+        // First get the current height
+        const infoRes = await fetch(`${DAEMON_HTTP}/get_info`);
+        const infoData = await infoRes.json();
+        const height = infoData.height || 1000;
+
         const data = await daemonRpc('get_coinbase_tx_sum', {
             height: 0,
-            count: 999999
+            count: height
         });
         res.json(data);
     } catch (error) {
@@ -419,6 +424,18 @@ app.get('/api/blocks_range/:start/:end', async (req, res) => {
         res.json(data);
     } catch (error) {
         res.status(500).json({ error: error.message });
+    }
+});
+
+// Get seed node info (remote VPS)
+const SEED_NODE_RPC = 'http://138.68.128.104:19081';
+app.get('/api/seed_info', async (req, res) => {
+    try {
+        const response = await fetch(`${SEED_NODE_RPC}/get_info`);
+        const data = await response.json();
+        res.json(data);
+    } catch (error) {
+        res.status(500).json({ error: error.message, height: null });
     }
 });
 

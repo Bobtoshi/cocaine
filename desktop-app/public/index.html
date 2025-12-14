@@ -273,7 +273,11 @@
         <div class="header-stats">
             <div class="hstat">
                 <div class="hstat-val" id="blockHeight">--</div>
-                <div class="hstat-label">Height</div>
+                <div class="hstat-label">Your Height</div>
+            </div>
+            <div class="hstat">
+                <div class="hstat-val" id="seedHeight" style="color:var(--purple)">--</div>
+                <div class="hstat-label">Seed Node</div>
             </div>
             <div class="hstat">
                 <div class="hstat-val blue" id="networkHashrate">--</div>
@@ -725,6 +729,34 @@
             } catch (e) {}
         }
 
+        async function fetchSeedInfo() {
+            try {
+                const res = await fetch('/api/seed_info');
+                const data = await res.json();
+                const seedEl = document.getElementById('seedHeight');
+                const localHeight = parseInt(document.getElementById('blockHeight').textContent.replace(/,/g, '')) || 0;
+
+                if (data.height) {
+                    seedEl.textContent = data.height.toLocaleString();
+                    // Color based on sync status
+                    const diff = data.height - localHeight;
+                    if (diff <= 0) {
+                        seedEl.style.color = 'var(--accent)'; // Synced - green
+                    } else if (diff <= 5) {
+                        seedEl.style.color = 'var(--orange)'; // Close - orange
+                    } else {
+                        seedEl.style.color = 'var(--red)'; // Behind - red
+                    }
+                } else {
+                    seedEl.textContent = '--';
+                    seedEl.style.color = 'var(--text2)';
+                }
+            } catch (e) {
+                document.getElementById('seedHeight').textContent = '--';
+                document.getElementById('seedHeight').style.color = 'var(--text2)';
+            }
+        }
+
         async function fetchMiningStatus() {
             try {
                 const res = await fetch('/api/mining_status');
@@ -1086,6 +1118,7 @@
         fetchDaemonInfo();
         fetchMiningStatus();
         fetchTotalSupply();
+        fetchSeedInfo();
         loadWalletList();
         updateBlockCharts();
         fetchConnections();
@@ -1095,6 +1128,7 @@
 
         setInterval(fetchDaemonInfo, 5000);
         setInterval(fetchMiningStatus, 3000);
+        setInterval(fetchSeedInfo, 10000);
         setInterval(() => { if (walletOpen) refreshWallet(); }, 30000);
         setInterval(updateBlockCharts, 30000);
         setInterval(fetchConnections, 15000);
