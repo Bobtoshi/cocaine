@@ -258,6 +258,7 @@ namespace nodetool
         is_closing(false),
         m_network_id(),
         m_enable_dns_seed_nodes(true),
+        m_seed_node_mode(false),
         max_connections(1)
     {}
     virtual ~node_server();
@@ -515,6 +516,7 @@ namespace nodetool
 
     bool m_enable_dns_seed_nodes;
     bool m_enable_dns_blocklist;
+    bool m_seed_node_mode; // true when --out-peers 0, disables hardcoded seed to prevent self-connection
 
     uint32_t max_connections;
   };

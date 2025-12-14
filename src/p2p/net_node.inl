@@ -522,10 +522,11 @@ namespace nodetool
 
     // Add Cocaine seed node as a priority peer for persistent connection
     // Skip if running with --out-peers 0 (seed node mode) to prevent self-connection
-    if (m_nettype == cryptonote::MAINNET)
     {
-      const uint32_t out_peers = command_line::get_arg(vm, arg_out_peers);
-      if (out_peers > 0)  // Only add seed node if we're allowing outgoing connections
+      const int64_t out_peers = command_line::get_arg(vm, arg_out_peers);
+      // out_peers: -1 = default (use normal connections), 0 = no outgoing, >0 = specific limit
+      m_seed_node_mode = (out_peers == 0);
+      if (m_nettype == cryptonote::MAINNET && !m_seed_node_mode)
       {
         const uint16_t default_port = cryptonote::get_config(m_nettype).P2P_DEFAULT_PORT;
         expect<epee::net_utils::network_address> adr = net::get_network_address("138.68.128.104", default_port);
@@ -535,7 +536,7 @@ namespace nodetool
           MINFO("Added Cocaine seed node as priority peer: 138.68.128.104:19080");
         }
       }
-      else
+      else if (m_seed_node_mode)
       {
         MINFO("Running in seed node mode (--out-peers 0), skipping hardcoded seed node to prevent self-connection");
       }
@@ -749,6 +750,11 @@ namespace nodetool
   std::set<std::string> node_server<t_payload_net_handler>::get_ip_seed_nodes() const
   {
     std::set<std::string> full_addrs;
+    // In seed node mode (--out-peers 0), don't return our own IP to prevent self-connection
+    if (m_seed_node_mode)
+    {
+      return full_addrs;
+    }
     if (m_nettype == cryptonote::MAINNET)
     {
       // Cocaine seed nodes
