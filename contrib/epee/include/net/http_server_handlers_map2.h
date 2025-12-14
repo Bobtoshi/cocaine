@@ -25,7 +25,8 @@
 // 
 
 
-#pragma once 
+#pragma once
+#include <cctype>
 #include "http_base.h"
 #include "jsonrpc_structs.h"
 #include "storages/portable_storage.h"
@@ -64,15 +65,45 @@
   if(false) return true; //just a stub to have "else if"
 
 #define MAP_URI_AUTO_JON2_IF(s_pattern, callback_f, command_type, cond) \
-    else if((query_info.m_URI == s_pattern) && (cond)) \
+    else if((query_info.m_uri_content.m_path == s_pattern) && (cond)) \
     { \
       handled = true; \
       uint64_t ticks = epee::misc_utils::get_tick_count(); \
       boost::value_initialized<command_type::request> req; \
-      bool parse_res = epee::serialization::load_t_from_json(static_cast<command_type::request&>(req), query_info.m_body); \
+      bool parse_res = false; \
+      if (!query_info.m_body.empty()) \
+      { \
+        parse_res = epee::serialization::load_t_from_json(static_cast<command_type::request&>(req), query_info.m_body); \
+      } \
+      else if (!query_info.m_uri_content.m_query_params.empty()) \
+      { \
+        std::string json_body = "{"; \
+        bool first = true; \
+        for (const auto& param : query_info.m_uri_content.m_query_params) \
+        { \
+          if (!first) json_body += ","; \
+          first = false; \
+          json_body += "\"" + param.first + "\":"; \
+          bool is_number = !param.second.empty(); \
+          if (is_number) { \
+            size_t start = 0; \
+            if (param.second[0] == '-' && param.second.size() > 1) start = 1; \
+            for (size_t i = start; i < param.second.size() && is_number; ++i) \
+              is_number = std::isdigit(static_cast<unsigned char>(param.second[i])); \
+          } \
+          if (is_number) json_body += param.second; \
+          else json_body += "\"" + param.second + "\""; \
+        } \
+        json_body += "}"; \
+        parse_res = epee::serialization::load_t_from_json(static_cast<command_type::request&>(req), json_body); \
+      } \
+      else \
+      { \
+        parse_res = epee::serialization::load_t_from_json(static_cast<command_type::request&>(req), "{}"); \
+      } \
       if (!parse_res) \
       { \
-         MERROR("Failed to parse json: \r\n" << query_info.m_body); \
+         MERROR("Failed to parse request: body=" << query_info.m_body); \
          response_info.m_response_code = 400; \
          response_info.m_response_comment = "Bad request"; \
          return true; \
@@ -100,7 +131,7 @@
 #define MAP_URI_AUTO_JON2(s_pattern, callback_f, command_type) MAP_URI_AUTO_JON2_IF(s_pattern, callback_f, command_type, true)
 
 #define MAP_URI_AUTO_BIN2(s_pattern, callback_f, command_type) \
-    else if(query_info.m_URI == s_pattern) \
+    else if(query_info.m_uri_content.m_path == s_pattern) \
     { \
       handled = true; \
       uint64_t ticks = epee::misc_utils::get_tick_count(); \
