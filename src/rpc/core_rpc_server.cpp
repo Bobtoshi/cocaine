@@ -483,14 +483,20 @@ namespace cryptonote
       return true;
     }
 
-    // Allow operations on fresh/bootstrap networks:
-    // - No sync target (no peers have told us about higher blocks)
-    // - AND we have at least 1 block (genesis exists)
-    // This enables mining on new networks while still requiring sync when peers exist
+    // Allow operations in these cases for small/new networks:
     uint64_t target = m_core.get_target_blockchain_height();
     uint64_t height = m_core.get_current_blockchain_height();
+
+    // Case 1: Fresh network with no peers (target == 0)
     if (target == 0 && height >= 1) {
-      return true;  // Fresh network with no peers, allow mining
+      return true;
+    }
+
+    // Case 2: We're close enough to the target (within 5 blocks)
+    // This handles the race condition where new blocks arrive faster than
+    // the node can mark itself as synced - target keeps moving
+    if (target > 0 && height >= 1 && (height + 5) >= target) {
+      return true;
     }
 
     return false;
