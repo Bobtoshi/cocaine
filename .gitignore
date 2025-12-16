@@ -130,3 +130,8 @@ release/bin/
 release/data/
 release/wallets/
 cocaine-src.tar.gz
+
+# Local data
+/dashboard/
+/wallets/
+/data/
