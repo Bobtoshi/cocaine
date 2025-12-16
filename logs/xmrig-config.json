@@ -1,0 +1,41 @@
+{
+  "autosave": true,
+  "cpu": {
+    "enabled": true,
+    "huge-pages": true,
+    "hw-aes": null,
+    "priority": null,
+    "memory-pool": false,
+    "yield": true
+  },
+  "opencl": false,
+  "cuda": false,
+  "donate-level": 0,
+  "log-file": "/Users/elliot/Desktop/cocaine/logs/miner.log",
+  "pools": [
+    {
+      "algo": "cryptonight",
+      "coin": null,
+      "url": "127.0.0.1:19081",
+      "user": "5jY1imwea21HPLnJUCqdVGPbjjPGCTiycSjUUu8qDeyyVdAbHzizBi93mL1HdBn3TxDM5HB7SnUMzDtaRzKVsjTyPKAoX8u",
+      "pass": "x",
+      "rig-id": null,
+      "nicehash": false,
+      "keepalive": true,
+      "enabled": true,
+      "tls": false,
+      "tls-fingerprint": null,
+      "daemon": true,
+      "daemon-poll-interval": 1000
+    }
+  ],
+  "retries": 5,
+  "retry-pause": 5,
+  "print-time": 60,
+  "health-print-time": 60,
+  "syslog": false,
+  "user-agent": null,
+  "verbose": 0,
+  "colors": false,
+  "threads": 2
+}

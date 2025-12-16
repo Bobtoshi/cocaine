@@ -226,18 +226,11 @@ app.get('/api/mining_status', async (req, res) => {
     }
 });
 
-// Start mining (via controller - uses XMRig)
+// Start mining (via daemon RPC)
 app.post('/api/mining/start', async (req, res) => {
     const { address, threads } = req.body;
     try {
-        const response = await fetch(`${CONTROLLER_URL}/miner/start`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                address: address,
-                threads: threads || 2
-            })
-        });
+        const response = await fetch(`${DAEMON_HTTP}/start_mining?miner_address=${address}&threads_count=${threads || 2}`);
         const data = await response.json();
         res.json(data);
     } catch (error) {
@@ -245,13 +238,10 @@ app.post('/api/mining/start', async (req, res) => {
     }
 });
 
-// Stop mining (via controller)
+// Stop mining (via daemon RPC)
 app.post('/api/mining/stop', async (req, res) => {
     try {
-        const response = await fetch(`${CONTROLLER_URL}/miner/stop`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
-        });
+        const response = await fetch(`${DAEMON_HTTP}/stop_mining`);
         const data = await response.json();
         res.json(data);
     } catch (error) {
@@ -259,26 +249,26 @@ app.post('/api/mining/stop', async (req, res) => {
     }
 });
 
-// Get miner status (via controller)
+// Get miner status (via daemon RPC)
 app.get('/api/miner/status', async (req, res) => {
     try {
-        const response = await fetch(`${CONTROLLER_URL}/miner/status`);
+        const response = await fetch(`${DAEMON_HTTP}/mining_status`);
         const data = await response.json();
-        res.json(data);
+        res.json({
+            running: data.active,
+            hashrate: data.speed,
+            threads: data.threads_count,
+            address: data.address,
+            difficulty: data.difficulty
+        });
     } catch (error) {
         res.status(500).json({ running: false, error: error.message });
     }
 });
 
-// Get miner logs
+// Get miner logs (not applicable for daemon mining, return empty)
 app.get('/api/miner/logs', async (req, res) => {
-    try {
-        const response = await fetch(`${CONTROLLER_URL}/miner/logs?lines=${req.query.lines || 50}`);
-        const data = await response.json();
-        res.json(data);
-    } catch (error) {
-        res.status(500).json({ logs: [], error: error.message });
-    }
+    res.json({ logs: ['Mining via daemon - check daemon logs'] });
 });
 
 // ==================== WALLET ENDPOINTS ====================
@@ -538,22 +528,7 @@ app.get('/api/wallet/status', async (req, res) => {
 
 // ==================== SERVER START ====================
 
-// Start controller in background
-let controllerProcess = null;
-function startController() {
-    const controllerPath = path.join(__dirname, 'controller.js');
-    if (fs.existsSync(controllerPath)) {
-        controllerProcess = spawn('node', [controllerPath], {
-            cwd: __dirname,
-            stdio: 'ignore',
-            detached: true
-        });
-        controllerProcess.unref();
-        console.log('[+] Controller started on port 8787');
-    } else {
-        console.log('[!] Controller not found, running without it');
-    }
-}
+// Controller no longer needed - mining uses daemon RPC directly
 
 const server = app.listen(PORT, '127.0.0.1', async () => {
     console.log(`
@@ -571,15 +546,11 @@ const server = app.listen(PORT, '127.0.0.1', async () => {
 ╚═══════════════════════════════════════════════════════════╝
 
 Dashboard running at http://127.0.0.1:${PORT}
-Controller: http://127.0.0.1:8787
 Daemon RPC: port 19081
 Wallet RPC: port 19083
 
 Press Ctrl+C to stop
 `);
-
-    // Start controller
-    startController();
 
     // Start wallet RPC
     try {
