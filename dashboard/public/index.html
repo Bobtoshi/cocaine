@@ -962,7 +962,7 @@
                     document.getElementById('timeToBlock').textContent = '--';
                 }
             } catch (e) {
-                // Fallback to old method if controller not available
+                // Fallback: get mining status directly from daemon
                 try {
                     const res = await fetch('/api/mining_status');
                     const data = await res.json();
@@ -971,14 +971,33 @@
                         document.getElementById('miningStatus').style.color = 'var(--accent)';
                         const speed = data.speed || 0;
                         document.getElementById('yourHashrate').textContent = speed;
+                        document.getElementById('miningThreads').textContent = data.threads_count || 0;
+
+                        // Fill in the address field if mining
+                        if (data.address) {
+                            document.getElementById('miningAddress').value = data.address;
+                        }
+
+                        // Set threads dropdown to match
+                        if (data.threads_count) {
+                            document.getElementById('miningThreadsSelect').value = data.threads_count;
+                        }
+
+                        // Calculate time to block
+                        if (speed > 0 && data.difficulty) {
+                            const seconds = data.difficulty / speed;
+                            document.getElementById('timeToBlock').textContent = formatDuration(seconds);
+                        }
+
                         updateHashrateChart(speed);
                     } else {
                         document.getElementById('miningStatus').textContent = 'Not Mining';
                         document.getElementById('miningStatus').style.color = 'var(--text-secondary)';
                         document.getElementById('yourHashrate').textContent = '0';
+                        document.getElementById('timeToBlock').textContent = '--';
                     }
                 } catch (e2) {
-                    // Silently fail if both methods fail
+                    // Silently fail if daemon not available
                 }
             }
         }
@@ -1163,6 +1182,7 @@
                     document.getElementById('createWalletForm').classList.add('hidden');
                     walletOpen = true;
                     currentAddress = data.address;
+                    loadWalletList(); // Refresh dropdown after creating wallet
                 } else {
                     alert('Error: ' + (data.error || 'Failed'));
                 }
@@ -1191,6 +1211,7 @@
                     currentAddress = data.address;
                     showWalletOpen(name, data.address);
                     refreshWallet();
+                    loadWalletList(); // Refresh dropdown after restoring wallet
                 } else {
                     alert('Error: ' + (data.error || 'Failed'));
                 }

@@ -32,8 +32,8 @@
 #define MONERO_DEFAULT_LOG_CATEGORY "blockchain.hardforks"
 
 const hardfork_t mainnet_hard_forks[] = {
-  // Cocaine: Single version from genesis (no hard forks needed for new chain)
-  { 1, 0, 0, 1733900000 },
+  // Cocaine: Start at version 12 for RandomX from genesis
+  { 12, 0, 0, 1733900000 },
 };
 const size_t num_mainnet_hard_forks = sizeof(mainnet_hard_forks) / sizeof(mainnet_hard_forks[0]);
 const uint64_t mainnet_hard_fork_version_1_till = (uint64_t)-1; // Version 1 forever
