@@ -36,7 +36,7 @@ const hardfork_t mainnet_hard_forks[] = {
   { 12, 0, 0, 1733900000 },
 };
 const size_t num_mainnet_hard_forks = sizeof(mainnet_hard_forks) / sizeof(mainnet_hard_forks[0]);
-const uint64_t mainnet_hard_fork_version_1_till = (uint64_t)-1; // Version 1 forever
+const uint64_t mainnet_hard_fork_version_1_till = 0; // No version 1 blocks - RandomX from genesis
 
 const hardfork_t testnet_hard_forks[] = {
   // version 1 from the start of the blockchain
