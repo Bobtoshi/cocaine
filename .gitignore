@@ -132,6 +132,6 @@ release/wallets/
 cocaine-src.tar.gz
 
 # Local data
-/dashboard/
+/dashboard/node_modules/
 /wallets/
 /data/
