@@ -921,6 +921,10 @@
                         <div class="mini-stat-val" style="color:var(--yellow)" id="timeToBlock">--</div>
                         <div class="mini-stat-label">Est. Time to Block</div>
                     </div>
+                    <div class="mini-stat">
+                        <div class="mini-stat-val" style="color:var(--accent)" id="mineMiner">--</div>
+                        <div class="mini-stat-label">Miner</div>
+                    </div>
                 </div>
 
                 <div class="row fill">
@@ -1408,10 +1412,14 @@
                 const res = await fetch(API + '/api/mining/status');
                 const data = await res.json();
 
+                // Show miner type
+                const minerType = data.miner === 'xmrig' ? 'XMRig' : data.miner === 'builtin' ? 'Built-in' : '--';
+                document.getElementById('mineMiner').textContent = data.active ? minerType : '--';
+
                 if (data.active) {
                     document.getElementById('mineStatusVal').textContent = 'MINING';
                     document.getElementById('mineStatusVal').style.color = 'var(--accent)';
-                    document.getElementById('mineHashrate').textContent = data.speed || 0;
+                    document.getElementById('mineHashrate').textContent = Math.round(data.speed) || 0;
                     document.getElementById('mineThreadsVal').textContent = data.threads_count || 0;
 
                     // Calculate time to block
@@ -1444,6 +1452,7 @@
                     document.getElementById('minePercent').textContent = '0%';
                     document.getElementById('mineExpected').textContent = '0';
                     document.getElementById('mineRewards').textContent = '0';
+                    document.getElementById('timeToBlock').textContent = '--';
                 }
             } catch (e) {}
         }
