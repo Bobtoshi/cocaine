@@ -247,6 +247,32 @@ app.get('/api/block/:height', async (req, res) => {
     }
 });
 
+// Get connected peers
+app.get('/api/peers', async (req, res) => {
+    try {
+        const response = await fetch(DAEMON_RPC, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ jsonrpc: '2.0', id: '0', method: 'get_connections' })
+        });
+        const data = await response.json();
+        const connections = data.result?.connections || [];
+        res.json({
+            connections: connections.map(c => ({
+                address: c.address,
+                height: c.height,
+                incoming: c.incoming,
+                state: c.state,
+                live_time: c.live_time,
+                recv_count: c.recv_count,
+                send_count: c.send_count
+            }))
+        });
+    } catch (error) {
+        res.json({ connections: [], error: error.message });
+    }
+});
+
 // Get recent blocks
 app.get('/api/blocks/recent', async (req, res) => {
     try {
@@ -410,7 +436,7 @@ app.post('/api/mining/start', async (req, res) => {
             const xmrigPath = getXmrigPath();
             const threadCount = threads || Math.max(1, require('os').cpus().length - 1);
 
-            // Create XMRig config for solo mining
+            // Create XMRig config for solo mining with RandomX
             const config = {
                 "autosave": false,
                 "cpu": {
@@ -426,6 +452,7 @@ app.post('/api/mining/start', async (req, res) => {
                 "cuda": false,
                 "log-file": XMRIG_LOG,
                 "pools": [{
+                    "algo": "rx/0",
                     "url": "127.0.0.1:19081",
                     "user": address,
                     "pass": "x",
@@ -763,7 +790,7 @@ app.post('/api/wallet/send', async (req, res) => {
         const params = {
             destinations: [{ address: address, amount: atomicAmount }],
             priority: 1,
-            ring_size: 16,
+            ring_size: 11,
             get_tx_key: true
         };
 

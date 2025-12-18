@@ -616,7 +616,7 @@
         <div class="header">
             <div class="logo-wrap">
                 <div class="logo">COCAINE</div>
-                <div class="logo-badge">MAINNET</div>
+                <div class="logo-badge">BETA</div>
             </div>
             <div class="header-stats">
                 <div class="hstat">
@@ -936,6 +936,13 @@
                                 <input type="text" id="mineAddr" placeholder="Your COCA address (starts with 5)">
                             </div>
                             <div class="input-group">
+                                <label>Miner Type</label>
+                                <select id="minerTypeSel">
+                                    <option value="builtin" selected>Built-in (Light)</option>
+                                    <option value="xmrig">XMRig (Faster)</option>
+                                </select>
+                            </div>
+                            <div class="input-group">
                                 <label>Threads</label>
                                 <select id="mineThreadSel">
                                     <option value="1">1 Thread</option>
@@ -1136,16 +1143,73 @@
             initTimeRanges();
             createParticles();
             loadSavedData();
+            loadChartHistory();
 
             // Start polling
             fetchInfo();
+            fetchPeers();
             setInterval(fetchInfo, 3000);
             setInterval(fetchMiningStatus, 2000);
             setInterval(fetchRecentBlocks, 10000);
+            setInterval(fetchPeers, 5000);
+            setInterval(saveChartHistory, 30000); // Save history every 30s
 
             fetchWalletList();
             fetchRecentBlocks();
         });
+
+        // Save chart history to localStorage
+        function saveChartHistory() {
+            try {
+                const data = {
+                    netHashHistory: netHashHistory.slice(-500), // Keep last 500 points
+                    diffHistory: diffHistory.slice(-500),
+                    timestamp: Date.now()
+                };
+                localStorage.setItem('chartHistory', JSON.stringify(data));
+            } catch (e) { console.error('Error saving chart history:', e); }
+        }
+
+        // Load chart history from localStorage
+        function loadChartHistory() {
+            try {
+                const saved = localStorage.getItem('chartHistory');
+                if (saved) {
+                    const data = JSON.parse(saved);
+                    // Only load if less than 1 hour old
+                    if (Date.now() - data.timestamp < 3600000) {
+                        netHashHistory = data.netHashHistory || [];
+                        diffHistory = data.diffHistory || [];
+                    }
+                }
+            } catch (e) { console.error('Error loading chart history:', e); }
+        }
+
+        // Fetch connected peers
+        async function fetchPeers() {
+            try {
+                const res = await fetch(API + '/api/peers');
+                const data = await res.json();
+                const peerList = document.getElementById('peerList');
+
+                if (!data.connections || data.connections.length === 0) {
+                    peerList.innerHTML = '<div style="color:var(--dim);padding:10px;">No peers connected</div>';
+                    return;
+                }
+
+                peerList.innerHTML = data.connections.map(peer => {
+                    const dir = peer.incoming ? 'IN' : 'OUT';
+                    const dirColor = peer.incoming ? 'var(--accent)' : 'var(--blue)';
+                    return `<div style="padding:4px 0; border-bottom:1px solid var(--border);">
+                        <span style="color:${dirColor};font-weight:bold;">[${dir}]</span>
+                        ${peer.address}
+                        <span style="color:var(--dim);">h:${peer.height}</span>
+                    </div>`;
+                }).join('');
+            } catch (e) {
+                document.getElementById('peerList').innerHTML = '<div style="color:var(--red);">Error loading peers</div>';
+            }
+        }
 
         function initTimeRanges() {
             document.querySelectorAll('.time-range').forEach(container => {
@@ -1269,6 +1333,9 @@
         function loadSavedData() {
             const addr = localStorage.getItem('miningAddress');
             if (addr) document.getElementById('mineAddr').value = addr;
+
+            const minerType = localStorage.getItem('minerType');
+            if (minerType) document.getElementById('minerTypeSel').value = minerType;
         }
 
         // ==================== API CALLS ====================
@@ -1449,10 +1516,12 @@
                     document.getElementById('mineStatusVal').textContent = 'IDLE';
                     document.getElementById('mineStatusVal').style.color = 'var(--dim)';
                     document.getElementById('mineHashrate').textContent = '0';
+                    document.getElementById('mineThreadsVal').textContent = '0';
                     document.getElementById('minePercent').textContent = '0%';
                     document.getElementById('mineExpected').textContent = '0';
                     document.getElementById('mineRewards').textContent = '0';
                     document.getElementById('timeToBlock').textContent = '--';
+                    document.getElementById('mineMiner').textContent = '--';
                 }
             } catch (e) {}
         }
@@ -1460,6 +1529,8 @@
         async function startMining() {
             const address = document.getElementById('mineAddr').value.trim();
             const threads = parseInt(document.getElementById('mineThreadSel').value);
+            const minerType = document.getElementById('minerTypeSel').value;
+            const useBuiltin = minerType === 'builtin';
 
             if (!address) return alert('Enter a mining address');
             if (!address.startsWith('5')) return alert('Invalid address format');
@@ -1468,12 +1539,13 @@
                 const res = await fetch(API + '/api/mining/start', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ address, threads })
+                    body: JSON.stringify({ address, threads, useBuiltin })
                 });
                 const data = await res.json();
 
                 if (data.status === 'OK' || data.status === 'Already mining') {
                     localStorage.setItem('miningAddress', address);
+                    localStorage.setItem('minerType', minerType);
                     fetchMiningStatus();
                 } else {
                     alert('Error: ' + (data.status || data.error || 'Unknown error'));
@@ -1705,19 +1777,20 @@
             const amt = parseFloat(document.getElementById('sendAmt').value);
 
             if (!to || !amt) return alert('Enter address and amount');
+            if (!to.startsWith('5')) return alert('Invalid address format (must start with 5)');
 
             try {
-                const res = await fetch(API + '/api/wallet/transfer', {
+                const res = await fetch(API + '/api/wallet/send', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        destinations: [{ address: to, amount: Math.round(amt * 1e12) }]
-                    })
+                    body: JSON.stringify({ address: to, amount: amt })
                 });
                 const data = await res.json();
 
                 if (data.error) throw new Error(data.error);
-                alert('Transaction sent! TX: ' + (data.result?.tx_hash || 'pending').substring(0, 16) + '...');
+                if (!data.success) throw new Error(data.error || 'Transaction failed');
+
+                alert('Transaction sent!\nTX: ' + (data.tx_hash || 'pending').substring(0, 24) + '...\nFee: ' + (data.fee || 0).toFixed(6) + ' COCA');
                 document.getElementById('sendTo').value = '';
                 document.getElementById('sendAmt').value = '';
                 refreshWallet();

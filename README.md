@@ -9,6 +9,8 @@
  ╚═════╝ ╚═════╝  ╚═════╝╚═╝  ╚═╝╚═╝╚═╝  ╚═══╝╚══════╝
 ```
 
+> ⚠️ **BETA SOFTWARE** - This project is in active development. Expect bugs and breaking changes. Use at your own risk.
+
 A privacy-focused cryptocurrency forked from Monero. Uses RandomX proof-of-work algorithm for CPU mining from genesis block.
 
 ## Quick Links
